@@ -177,7 +177,7 @@ export const SocialMediaForm = forwardRef<ListingFormHandle, Props>(
         const endpoint = `${API_URL}/api/listing/socials/${listingSlug}`;
 
         const response = await fetch(endpoint, {
-          method: "POST",
+          method: "PUT",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
