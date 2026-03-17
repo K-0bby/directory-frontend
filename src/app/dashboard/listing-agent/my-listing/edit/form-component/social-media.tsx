@@ -66,6 +66,7 @@ export const socialMediaSchema = z.object({
 export type SocialMediaFormValues = z.infer<typeof socialMediaSchema>;
 
 type Props = {
+  listingId: number | string;
   listingSlug: string;
   listingType: "business" | "event" | "community";
   onSuccess?: () => void;
@@ -115,7 +116,7 @@ const socialPlatforms = [
 --------------------------------------------------- */
 export const SocialMediaForm = forwardRef<ListingFormHandle, Props>(
   function SocialMediaFormComponent(
-    { listingSlug, listingType, onSuccess, initialData},
+    { listingId, listingType, onSuccess, initialData },
     ref
   ) {
     const {
@@ -149,7 +150,7 @@ export const SocialMediaForm = forwardRef<ListingFormHandle, Props>(
 
     const handleFormSubmit = async (data: SocialMediaFormValues) => {
       try {
-        if (!listingSlug) {
+        if (!listingId) {
           throw new Error("Listing ID is missing. Please restart the process.");
         }
 
@@ -174,7 +175,7 @@ export const SocialMediaForm = forwardRef<ListingFormHandle, Props>(
 
         const API_URL = process.env.API_URL || "https://me-fie.co.uk";
         // Ensure this endpoint matches your backend route exactly (/social vs /socials)
-        const endpoint = `${API_URL}/api/listing/socials/${listingSlug}`;
+        const endpoint = `${API_URL}/api/listing/socials/${listingId}`;
 
         const response = await fetch(endpoint, {
           method: "PUT",
