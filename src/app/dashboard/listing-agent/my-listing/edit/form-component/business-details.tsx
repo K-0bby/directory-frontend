@@ -120,7 +120,19 @@ export const DetailsFormSchema = z.object({
   event_start_time: z.string().optional(),
   event_end_time: z.string().optional(),
   event_location: z.string().optional(),
-});
+}).refine(
+  (data) => {
+    // Both can be empty, but if one has a value, the other must also have a value
+    const hasPrice = data.event_price && data.event_price.trim() !== "";
+    const hasCurrency = data.event_currency && data.event_currency.trim() !== "";
+    // Allow: both empty, or both have values
+    return !((hasPrice && !hasCurrency) || (!hasPrice && hasCurrency));
+  },
+  {
+    message: "Price and currency must both be provided or both be empty",
+    path: ["event_price"],
+  }
+);
 
 const formTextConfig = {
   business: {
@@ -154,6 +166,7 @@ export type DetailsFormValues = z.infer<typeof DetailsFormSchema>;
 type Props = {
   listingType: "business" | "event" | "community";
   listingSlug: string;
+  listingId?: number | string;
   initialData?: DetailsFormValues;
 };
 
@@ -296,12 +309,23 @@ export const BusinessDetailsForm = forwardRef<ListingFormHandle, Props>(
                   : { ...defaultDay, enabled: false };
               });
             reset({
-              address: d.address || d.location?.address || "",
-              city: d.city || d.location?.city || "",
-              country: d.country || d.location?.country || "Ghana",
+              // For events, map from event-specific fields, otherwise use standard fields
+              address: d.type === "event" ? (d.event_venue || d.address || d.location?.address || "") : (d.address || d.location?.address || ""),
+              city: d.type === "event" ? (d.event_city || d.city || d.location?.city || "") : (d.city || d.location?.city || ""),
+              country: d.type === "event" ? (d.event_country || d.country || d.location?.country || "Ghana") : (d.country || d.location?.country || "Ghana"),
               google_plus_code:
                 d.google_plus_code || d.location?.google_plus_code || "",
               businessHours: mappedHours,
+              // Event-specific fields
+              event_price: d.event_price || "",
+              event_currency: d.event_currency || "",
+              event_ticket_url: d.event_ticket_url || "",
+              event_online_url: d.event_online_url || "",
+              event_start_date: d.event_start_date || "",
+              event_end_date: d.event_end_date || "",
+              event_start_time: d.event_start_time || "",
+              event_end_time: d.event_end_time || "",
+              event_location: d.event_location || "",
             });
           }
         } catch (err) {
@@ -345,7 +369,12 @@ export const BusinessDetailsForm = forwardRef<ListingFormHandle, Props>(
         const detailsPayload: Record<string, any> = {};
 
         if (listingType === "event") {
-          // For events: use event-specific field names and EXCLUDE google_plus_code
+          // Send standard field names that backend expects (required for validation)
+          detailsPayload.address = data.address;
+          detailsPayload.city = data.city;
+          detailsPayload.country = data.country;
+
+          // Also include event-specific field names
           detailsPayload.event_venue = data.address;
           detailsPayload.event_city = data.city;
           detailsPayload.event_country = data.country;
@@ -368,17 +397,7 @@ export const BusinessDetailsForm = forwardRef<ListingFormHandle, Props>(
           detailsPayload.google_plus_code = data.google_plus_code;
         }
 
-        const enabledHours =
-          listingType !== "event"
-            ? data.businessHours
-                .filter((h: DaySchedule) => h.enabled)
-                .map((h: DaySchedule) => ({
-                  day_of_week: h.day_of_week,
-                  open_time: h.startTime,
-                  close_time: h.endTime,
-                }))
-            : [];
-
+        // Only fetch address (skip opening hours for events)
         const detailsReq = fetch(
           `${API_URL}/api/listing/${effectiveSlug}/address`,
           {
@@ -392,32 +411,54 @@ export const BusinessDetailsForm = forwardRef<ListingFormHandle, Props>(
           },
         );
 
-        const hoursReq = fetch(
-          `${API_URL}/api/listing/${effectiveSlug}/opening_hours`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
+        let detailsRes;
+        let detailsJson;
+
+        if (listingType === "event") {
+          // For events: only save address details, skip opening hours
+          detailsRes = await detailsReq;
+          detailsJson = await detailsRes.json();
+
+          if (!detailsRes.ok) {
+            console.error("❌ Update failed - Details:", detailsJson);
+            throw new Error("Update failed");
+          }
+        } else {
+          // For business/community: also save opening hours
+          const enabledHours = data.businessHours
+            .filter((h: DaySchedule) => h.enabled)
+            .map((h: DaySchedule) => ({
+              day_of_week: h.day_of_week,
+              open_time: h.startTime,
+              close_time: h.endTime,
+            }));
+
+          const hoursReq = fetch(
+            `${API_URL}/api/listing/${effectiveSlug}/opening_hours`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify(enabledHours),
             },
-            body: JSON.stringify(enabledHours),
-          },
-        );
+          );
 
-        const [detailsRes, hoursRes] = await Promise.all([
-          detailsReq,
-          hoursReq,
-        ]);
+          const [detailsResp, hoursRes] = await Promise.all([
+            detailsReq,
+            hoursReq,
+          ]);
 
-        // Log API responses
-        const detailsJson = await detailsRes.json();
-        const hoursJson = hoursRes.ok ? await hoursRes.json() : null;
+          detailsJson = await detailsResp.json();
+          const hoursJson = hoursRes.ok ? await hoursRes.json() : null;
 
-        if (!detailsRes.ok || !hoursRes?.ok) {
-          console.error("❌ Update failed - Details:", detailsJson);
-          console.error("❌ Update failed - Hours:", hoursJson);
-          throw new Error("Update failed");
+          if (!detailsResp.ok || !hoursRes.ok) {
+            console.error("❌ Update failed - Details:", detailsJson);
+            console.error("❌ Update failed - Hours:", hoursJson);
+            throw new Error("Update failed");
+          }
         }
 
         setBusinessDetails({ ...businessDetails, ...data });

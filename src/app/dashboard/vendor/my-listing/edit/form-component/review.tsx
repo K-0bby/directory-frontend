@@ -13,11 +13,17 @@ import {
   Tag,
   Globe,
   Calendar,
+  Facebook,
+  Instagram,
+  Music2,
+  Twitter,
+  Youtube,
 } from "lucide-react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useListing } from "@/context/listing-form-context";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface Props {
   listingSlug: string;
@@ -37,6 +43,13 @@ interface ApiListingData {
   country: string | null;
   email: string | null;
   website?: string | null;
+  socials?: {
+    facebook: string | null;
+    instagram: string | null;
+    twitter: string | null;
+    tiktok: string | null;
+    youtube: string | null;
+  }[];
   opening_hours: {
     day_of_week: string;
     open_time: string;
@@ -121,6 +134,8 @@ export const ReviewSubmitStep = forwardRef<ListingFormHandle, Props>(
     const isEvent = listingData?.type === "event";
 
     const displayWebsite = listingData?.website;
+
+    const socials = listingData?.socials?.[0];
 
     // Prepare Display Data (Prefer API data, fallback to "Not provided")
     const displayImage =
@@ -213,7 +228,7 @@ export const ReviewSubmitStep = forwardRef<ListingFormHandle, Props>(
               {/* Name */}
               <div className="space-y-1">
                 <span className="text-sm font-medium text-gray-900">
-                 {isEvent ? "Event Name" : "Business Name"}
+                  {isEvent ? "Event Name" : "Business Name"}
                 </span>
                 <p className="text-sm text-gray-600">
                   {listingData?.name || "Not provided"}
@@ -255,6 +270,64 @@ export const ReviewSubmitStep = forwardRef<ListingFormHandle, Props>(
                   {displayWebsite}
                 </p>
               </div>
+
+              {socials &&
+                Object.values(socials).some((val) => val !== null) && (
+                  <div className="space-y-2 col-span-1 md:col-span-2 border-t pt-4">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                      Social Presence
+                    </span>
+                    <div className="flex flex-wrap gap-5">
+                      {socials.facebook && (
+                        <Link
+                          href={socials.facebook}
+                          target="_blank"
+                          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-[#93C01F] transition-colors"
+                        >
+                          <Facebook className="w-4 h-4 text-[#1877F2]" />{" "}
+                          Facebook
+                        </Link>
+                      )}
+                      {socials.instagram && (
+                        <Link
+                          href={socials.instagram}
+                          target="_blank"
+                          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-[#93C01F] transition-colors"
+                        >
+                          <Instagram className="w-4 h-4 text-[#E4405F]" />{" "}
+                          Instagram
+                        </Link>
+                      )}
+                      {socials.twitter && (
+                        <Link
+                          href={socials.twitter}
+                          target="_blank"
+                          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-[#93C01F] transition-colors"
+                        >
+                          <Twitter className="w-4 h-4 text-[#1DA1F2]" /> Twitter
+                        </Link>
+                      )}
+                      {socials.tiktok && (
+                        <Link
+                          href={socials.tiktok}
+                          target="_blank"
+                          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-[#93C01F] transition-colors"
+                        >
+                          <Music2 className="w-4 h-4 text-black" /> TikTok
+                        </Link>
+                      )}
+                      {socials.youtube && (
+                        <Link
+                          href={socials.youtube}
+                          target="_blank"
+                          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-[#93C01F] transition-colors"
+                        >
+                          <Youtube className="w-4 h-4 text-[#FF0000]" /> YouTube
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
 
               {/* Hours */}
               {isEvent ? (

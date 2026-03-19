@@ -67,6 +67,7 @@ interface Category {
 interface Props {
   listingType: "business" | "event" | "community";
   listingSlug: string;
+  listingId?: number | string;
   initialData?: BusinessFormValues; // Add this
 }
 
@@ -129,8 +130,18 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
     useEffect(() => {
       if (initialData) {
         form.reset(initialData);
+        // Set selectedMainCategoryId from the first category_id to display in dropdown
+        if (initialData.category_ids && initialData.category_ids.length > 0) {
+          const firstCategoryId = initialData.category_ids[0];
+          setSelectedMainCategoryId(firstCategoryId);
+          // Also find and set the main category object
+          const mainCat = categories.find((c) => String(c.id) === firstCategoryId);
+          if (mainCat) {
+            setSelectedMainCategory(mainCat);
+          }
+        }
       }
-    }, [initialData, form]);
+    }, [initialData, form, categories]);
 
     const {
       register,
@@ -286,7 +297,7 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
                 rawData.secondary_country_code || "",
               )
             : "",
-          category_ids: rawData.category_ids.map((id) => Number(id)),
+          category_ids: rawData.category_ids.map((id) => String(id)),
         };
 
         const token = localStorage.getItem("authToken");

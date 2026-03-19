@@ -338,12 +338,24 @@ export default function Dashboard() {
             Here is what&apos;s happening with your listings
           </p>
         </div>
-        {/* <Button className="bg-[#93C01F] py-3.5 px-4 hover:bg-[#93C01F]/80 cursor-pointer">
-          <span>
-            <Plus className="w-4 h-4" />
-          </span>
-          Add new listing
-        </Button> */}
+        {/* TEST TOAST BUTTONS - Remove after testing */}
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => toast.success("Success message test", { description: "This is a success toast" })}
+            className="cursor-pointer"
+          >
+            Test Success Toast
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => toast.error("Error message test", { description: "This is an error toast" })}
+            className="cursor-pointer"
+          >
+            Test Error Toast
+          </Button>
+        </div>
+        {/* END TEST TOAST BUTTONS */}
       </div>
 
       {/* Dashboard Content */}

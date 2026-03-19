@@ -10,6 +10,7 @@ import { FileUploader } from "@/components/dashboard/listing/media-uploader";
 interface Props {
   listingType: "business" | "event" | "community";
   listingSlug: string;
+  listingId?: number | string;
 }
 
 // Helper to check if we need compression

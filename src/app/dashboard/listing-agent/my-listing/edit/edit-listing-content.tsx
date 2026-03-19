@@ -63,6 +63,7 @@ export default function EditListingContent() {
   } = context;
 
   const [listingSlug, setListingSlug] = useState<string>("");
+  const [listingId, setListingId] = useState<number | string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
@@ -103,6 +104,11 @@ export default function EditListingContent() {
 
         const json = await response.json();
         const data = json.data || json;
+
+        // Store the listing ID for form submissions
+        if (data.id) {
+          setListingId(data.id);
+        }
 
         // --- MAP API DATA TO CONTEXT ---
 
@@ -157,13 +163,24 @@ export default function EditListingContent() {
 
      
         setBusinessDetails({
-          address: data.address,
-          country: data.country,
-          city: data.city,
-          google_plus_code: data.google_plus_code,
-          businessHours: mapApiHoursToUi(data.opening_hours || []),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any);
+        // For events, map from event-specific field names, otherwise use standard names
+        address: data.type === "event" ? (data.event_venue || data.address || "") : data.address,
+        country: data.type === "event" ? (data.event_country || data.country || "") : data.country,
+        city: data.type === "event" ? (data.event_city || data.city || "") : data.city,
+        google_plus_code: data.google_plus_code,
+        businessHours: mapApiHoursToUi(data.opening_hours || []),
+        // Event-specific fields
+        event_price: data.event_price || "",
+        event_currency: data.event_currency || "",
+        event_ticket_url: data.event_ticket_url || "",
+        event_online_url: data.event_online_url || "",
+        event_start_date: data.event_start_date || "",
+        event_end_date: data.event_end_date || "",
+        event_start_time: data.event_start_time || "",
+        event_end_time: data.event_end_time || "",
+        event_location: data.event_location || "",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
 
         // 3. Social Media
         if (data.socials && setSocials) {
@@ -272,6 +289,7 @@ export default function EditListingContent() {
       ref: formRef,
       listingType,
       listingSlug,
+      listingId,
     };
 
     switch (currentStep) {

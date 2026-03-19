@@ -115,7 +115,19 @@ export const DetailsFormSchema = z.object({
   event_start_time: z.string().optional(),
   event_end_time: z.string().optional(),
   event_location: z.string().optional(),
-});
+}).refine(
+  (data) => {
+    // Both can be empty, but if one has a value, the other must also have a value
+    const hasPrice = data.event_price && data.event_price.trim() !== "";
+    const hasCurrency = data.event_currency && data.event_currency.trim() !== "";
+    // Allow: both empty, or both have values
+    return !((hasPrice && !hasCurrency) || (!hasPrice && hasCurrency));
+  },
+  {
+    message: "Price and currency must both be provided or both be empty",
+    path: ["event_price"],
+  }
+);
 
 const formTextConfig = {
   business: {
