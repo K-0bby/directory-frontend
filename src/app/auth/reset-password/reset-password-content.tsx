@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -18,6 +18,8 @@ export default function ResetPassword() {
     password_confirmation: "",
   });
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -34,7 +36,7 @@ export default function ResetPassword() {
     // Validate that we have the required parameters
     if (!token || !email) {
       setError(
-        "Invalid or expired password reset link. Please request a new reset link."
+        "Invalid or expired password reset link. Please request a new reset link.",
       );
     }
   }, [token, email]);
@@ -111,7 +113,7 @@ export default function ResetPassword() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || data.error || "Failed to reset password"
+          data.message || data.error || "Failed to reset password",
         );
       }
 
@@ -133,7 +135,7 @@ export default function ResetPassword() {
       setError(
         error instanceof Error
           ? error.message
-          : "Failed to reset password. Please try again."
+          : "Failed to reset password. Please try again.",
       );
     } finally {
       setIsLoading(false);
@@ -304,16 +306,29 @@ export default function ResetPassword() {
                   <Label htmlFor="password" className="text-sm">
                     New Password <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your new password"
-                    className="w-full"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required
-                    disabled={isLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your new password"
+                      className="w-full"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      required
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                   {errors.password && (
                     <p className="text-red-500 text-sm">{errors.password}</p>
                   )}
@@ -323,16 +338,31 @@ export default function ResetPassword() {
                   <Label htmlFor="password_confirmation" className="text-sm">
                     Confirm New Password <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="password_confirmation"
-                    type="password"
-                    placeholder="Confirm your new password"
-                    className="w-full"
-                    value={formData.password_confirmation}
-                    onChange={handleInputChange}
-                    required
-                    disabled={isLoading}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password_confirmation"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm your new password"
+                      className="w-full"
+                      value={formData.password_confirmation}
+                      onChange={handleInputChange}
+                      required
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                   {errors.password_confirmation && (
                     <p className="text-red-500 text-sm">
                       {errors.password_confirmation}
