@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -21,7 +21,7 @@ function SignupForm() {
   const router = useRouter();
   const { login } = useAuth();
 
-   const searchParams = useSearchParams();
+  const searchParams = useSearchParams();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
@@ -29,13 +29,15 @@ function SignupForm() {
   const [, setError] = useState("");
 
   const redirectPath = searchParams.get("redirect") || "/";
+  const verifyEmail = searchParams.get("email") || "";
+  const isVerifyMode = searchParams.get("verify") === "true";
 
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
     phone: "",
     country_code: "+233",
-    email: "",
+    email: verifyEmail,
     password: "",
   });
 
@@ -88,6 +90,16 @@ function SignupForm() {
     setErrors(newErrors);
     return isValid;
   };
+
+  // Handle verify mode from login redirect
+  useEffect(() => {
+    if (isVerifyMode && verifyEmail) {
+      setFormData((prev) => ({ ...prev, email: verifyEmail }));
+      setShowOtp(true);
+      // Optionally auto-resend OTP
+      handleResendOtp(true);
+    }
+  }, [isVerifyMode, verifyEmail]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,7 +206,7 @@ function SignupForm() {
     }
   };
 
-  const handleResendOtp = async () => {
+  const handleResendOtp = useCallback(async (isAutoResend = false) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://me-fie.co.uk";
       const res = await fetch(`${API_URL}/api/resend_otp`, {
@@ -202,12 +214,17 @@ function SignupForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
       });
-      if (!res.ok) throw new Error("Failed to resend");
-      toast.success("OTP Resent successfully.");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to resend");
+      if (!isAutoResend) {
+        toast.success(data.message || "OTP Resent successfully.");
+      }
     } catch (err: any) {
-      toast.error("Resend Failed", { description: err.message });
+      if (!isAutoResend) {
+        toast.error("Resend Failed", { description: err.message });
+      }
     }
-  };
+  }, [formData.email]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;

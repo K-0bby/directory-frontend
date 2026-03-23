@@ -9,6 +9,8 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
 
 function LoginForm() {
   const router = useRouter();
@@ -132,6 +134,25 @@ function LoginForm() {
       // console.error("❌ Login failed:", error);
       // If the error message includes "401" or typical auth failure text, show specific message
       const msg = error instanceof Error ? error.message : String(error);
+
+      // Check if it's an unverified email case
+      if (
+        msg.toLowerCase().includes("not verified") ||
+        msg.toLowerCase().includes("verify your email") ||
+        msg.toLowerCase().includes("email not verified") ||
+        msg.toLowerCase().includes("please verify")
+      ) {
+        // Show info toast
+        toast.info("Please verify your email", {
+          description: "Redirecting to verification page...",
+        });
+        
+        // Redirect to signup with email pre-filled and verification flow
+        const encodedEmail = encodeURIComponent(formData.email);
+        router.push(`/auth/signup?redirect=${redirectPath}&email=${encodedEmail}&verify=true`);
+        return;
+      }
+
       setError(msg.includes("401") ? "Incorrect email or password." : msg);
     } finally {
       setIsLoading(false);
