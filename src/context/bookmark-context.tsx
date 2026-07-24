@@ -8,6 +8,7 @@ import React, {
   useCallback,
 } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/auth-context";
 
 export type BookmarkItemType = "business" | "event" | "community";
 
@@ -25,6 +26,7 @@ const BookmarkContext = createContext<BookmarkContextType | undefined>(
 );
 
 export function BookmarkProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [bookmarkedSlugs, setBookmarkedSlugs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -79,9 +81,24 @@ export function BookmarkProvider({ children }: { children: React.ReactNode }) {
   }, []); // Empty dependency array ensures this doesn't trigger unnecessary re-renders
 
   // --- 2. Call useEffect SECOND ---
+  // Deliberately gated on AuthProvider's own resolved isAuthenticated state
+  // (not an independent localStorage read) — firing this in parallel with
+  // AuthProvider's own token validation raced two authenticated requests
+  // against a possibly-stale token, and the global 401 interceptor could
+  // then redirect to login well after the user had already navigated to a
+  // public listing page, making an expired session look like a bug in the
+  // listing page itself.
   useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      setBookmarkedSlugs([]);
+      setIsLoading(false);
+      return;
+    }
+
     refreshBookmarks();
-  }, [refreshBookmarks]);
+  }, [authLoading, isAuthenticated, refreshBookmarks]);
 
   // --- Toggle Bookmark ---
   const toggleBookmark = async (slugOrId: string) => {

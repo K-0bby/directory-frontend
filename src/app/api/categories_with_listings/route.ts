@@ -12,7 +12,7 @@ export async function GET() {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        next: { revalidate: 3600 },
+        cache: 'no-store',
       }
     );
 
@@ -28,9 +28,7 @@ export async function GET() {
 
     return NextResponse.json(data, {
       status: 200,
-      headers: {
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
-      },
+      headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {
     console.error('Error fetching categories_with_listings:', error);

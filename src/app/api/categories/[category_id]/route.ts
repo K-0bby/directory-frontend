@@ -57,7 +57,10 @@ export async function PUT(
 
     const data = await response.json();
 
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (error) {
     console.error('Error updating category:', error);
     return NextResponse.json(
@@ -99,6 +102,7 @@ export async function DELETE(
 
     return NextResponse.json(data, {
       status: response.status,
+      headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {
     console.error('Error deleting category:', error);
