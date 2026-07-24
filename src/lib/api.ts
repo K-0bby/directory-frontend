@@ -482,8 +482,7 @@ export async function getCategories(token?: string, params: SearchParams = {}): 
   const queryString = buildQueryString(params);
   const response = await fetch(`/api/categories?${queryString}`, {
     headers: getAuthHeaders(token),
-    cache: 'force-cache',
-    next: { revalidate: 3600 },
+    cache: 'no-store',
   });
 
   if (!response.ok) {

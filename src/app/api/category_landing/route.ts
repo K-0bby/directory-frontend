@@ -60,7 +60,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       return NextResponse.json(

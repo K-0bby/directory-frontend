@@ -271,16 +271,28 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
         return;
       }
 
+      // An already-attached category may since have been archived — it no
+      // longer appears in the active `categories` list fetched for new
+      // selection, but it must still render correctly and stay removable on
+      // this listing rather than silently vanishing (PRD §17). No other
+      // archived category becomes newly selectable this way, since only
+      // what's already attached to this listing is added back in.
+      setMainCategories((prev) => (prev.some((c) => c.id === main.id) ? prev : [...prev, main]));
+
       const children = categories.filter((category) =>
         category.parent_id === main.id || category.parent_slug === main.slug,
       );
       const savedChild = savedCategories.find((saved) =>
-        children.some((child) => child.id === saved.id),
+        saved.id !== main.id && (saved.parent_id === main.id || saved.parent_slug === main.slug),
       );
+      const childrenWithSaved =
+        savedChild && !children.some((child) => child.id === savedChild.id)
+          ? [...children, savedChild]
+          : children;
 
       setSelectedMainCategoryId(String(main.id));
       setSelectedMainCategory(main);
-      setSubCategories(children);
+      setSubCategories(childrenWithSaved);
       setValue(
         "category_ids",
         [String(main.id), ...(savedChild ? [String(savedChild.id)] : [])],

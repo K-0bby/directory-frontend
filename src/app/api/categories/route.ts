@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCached, setCached } from "@/lib/server-cache";
-
-const TTL = 5 * 60 * 1000; // 5 minutes
 
 const API_BASE_URL = (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'https://me-fie.co.uk').replace(/\/$/, '');
 
+// Category taxonomy is governed by Laravel's own versioned CategoryCache
+// service (immediate consistency after a committed mutation) — this BFF
+// layer must never add its own caching on top of that. See
+// md files/V1-category-taxonomy-lifecycle-cache-PRD.md §15.4.
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -13,15 +14,6 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams();
     searchParams.forEach((value, key) => params.append(key, value));
     const queryString = params.toString();
-
-    const cacheKey = `categories:${queryString}`;
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached, {
-        status: 200,
-        headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=60' },
-      });
-    }
 
     const response = await fetch(
       `${API_BASE_URL.replace(/\/$/, "")}/api/categories${queryString ? `?${queryString}` : ""}`,
@@ -32,7 +24,7 @@ export async function GET(request: NextRequest) {
           'Accept': 'application/json',
           ...(authHeader && { Authorization: authHeader }),
         },
-        next: { revalidate: 300 },
+        cache: 'no-store',
       }
     );
 
@@ -40,18 +32,15 @@ export async function GET(request: NextRequest) {
       const errorData = await response.json().catch(() => ({}));
       return NextResponse.json(
         { error: errorData.message || 'Failed to fetch categories' },
-        { status: response.status }
+        { status: response.status, headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
     const data = await response.json();
 
-    setCached(cacheKey, data, TTL);
     return NextResponse.json(data, {
       status: 200,
-      headers: {
-        'Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
-      },
+      headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {
     console.error('Error fetching categories:', error);
@@ -98,7 +87,10 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (error) {
     console.error('Error creating category:', error);
     return NextResponse.json(

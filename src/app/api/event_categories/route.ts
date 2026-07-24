@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractClientIp } from "@/lib/bff/extract-client-ip";
-import { getCached, setCached } from "@/lib/server-cache";
-
-const TTL = 5 * 60 * 1000; // 5 minutes
 
 const API_BASE_URL = (
   process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "https://me-fie.co.uk"
@@ -12,14 +9,6 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const backendUrl = new URL(`${API_BASE_URL}/api/event_categories`);
-
-    const cacheKey = `event_categories:${searchParams.toString()}`;
-    const cached = getCached(cacheKey);
-    if (cached) {
-      return NextResponse.json(cached, {
-        headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
-      });
-    }
 
     searchParams.forEach((value, key) => {
       backendUrl.searchParams.set(key, value);
@@ -38,7 +27,7 @@ export async function GET(request: NextRequest) {
         Accept: "application/json",
         ...(authHeader ? { Authorization: authHeader } : {}),
       },
-      next: { revalidate: 300 },
+      cache: "no-store",
     });
 
     const rawText = await response.text();
@@ -68,9 +57,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    setCached(cacheKey, data, TTL);
     return NextResponse.json(data, {
-      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
+      headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
     console.error("event_categories proxy error:", error);
