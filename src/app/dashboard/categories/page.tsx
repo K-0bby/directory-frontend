@@ -153,6 +153,7 @@ function CategoriesPageContent() {
   const [view, setView] = useState<"active" | "archived">("active");
   const [selectedMainSlug, setSelectedMainSlug] = useState<string | null>(null);
   const [searchMainCategory, setSearchMainCategory] = useState("");
+  const [searchSubCategory, setSearchSubCategory] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -218,6 +219,20 @@ function CategoriesPageContent() {
         (c) => c.parent_slug === selectedMainCategory.slug && (view === "archived" ? c.archived_at !== null : c.archived_at === null),
       )
     : [];
+  const normalizedSubCategorySearch = searchSubCategory.trim().toLowerCase();
+  const filteredSubCategories = normalizedSubCategorySearch
+    ? subCategories.filter((category) => category.name.toLowerCase().includes(normalizedSubCategorySearch))
+    : subCategories;
+
+  const handleViewChange = (nextView: "active" | "archived") => {
+    setView(nextView);
+    setSearchSubCategory("");
+  };
+
+  const handleMainCategorySelect = (slug: string) => {
+    setSelectedMainSlug(slug);
+    setSearchSubCategory("");
+  };
 
   function mergeCandidates(category: AdminCategory): AdminCategory[] {
     return categories.filter(
@@ -512,13 +527,13 @@ function CategoriesPageContent() {
           <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
             <button
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${view === "active" ? "bg-white shadow-sm font-medium text-gray-900" : "text-gray-500"}`}
-              onClick={() => setView("active")}
+              onClick={() => handleViewChange("active")}
             >
               Active
             </button>
             <button
               className={`px-3 py-1.5 text-sm rounded-md transition-colors ${view === "archived" ? "bg-white shadow-sm font-medium text-gray-900" : "text-gray-500"}`}
-              onClick={() => setView("archived")}
+              onClick={() => handleViewChange("archived")}
             >
               Archived
             </button>
@@ -554,7 +569,7 @@ function CategoriesPageContent() {
                         ? "bg-[#F4F9E8] border-[#93C01F] text-gray-900 font-medium"
                         : "bg-white border-gray-100 text-gray-600 hover:bg-gray-50"
                     }`}
-                    onClick={() => setSelectedMainSlug(cat.slug)}
+                    onClick={() => handleMainCategorySelect(cat.slug)}
                   >
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
@@ -589,6 +604,22 @@ function CategoriesPageContent() {
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 {selectedMainCategory ? `${selectedMainCategory.name} — Sub Categories` : "Sub Categories"}
               </h2>
+              {selectedMainCategory && (
+                <div className="mb-4 space-y-1.5">
+                  <Input
+                    value={searchSubCategory}
+                    onChange={(event) => setSearchSubCategory(event.target.value)}
+                    placeholder="Search sub category..."
+                    aria-label={`Search subcategories under ${selectedMainCategory.name}`}
+                  />
+                  {normalizedSubCategorySearch && (
+                    <p className="text-xs text-gray-400">
+                      {filteredSubCategories.length} of {subCategories.length} subcategor
+                      {subCategories.length === 1 ? "y" : "ies"} matched
+                    </p>
+                  )}
+                </div>
+              )}
               {view === "active" && activeSelectedMainCategory && (
                 <Button
                   variant="secondary"
@@ -599,7 +630,7 @@ function CategoriesPageContent() {
                 </Button>
               )}
               <div className="space-y-3">
-                {subCategories.map((sub) => (
+                {filteredSubCategories.map((sub) => (
                   <div
                     key={sub.slug}
                     className="flex items-center justify-between group border-b border-gray-50 pb-3 last:border-0"
@@ -617,6 +648,11 @@ function CategoriesPageContent() {
                 {subCategories.length === 0 && (
                   <div className="text-center text-gray-500 py-4">
                     {selectedMainCategory ? `No sub categories for ${selectedMainCategory.name}` : "Select a main category"}
+                  </div>
+                )}
+                {subCategories.length > 0 && filteredSubCategories.length === 0 && (
+                  <div className="text-center text-gray-500 py-4">
+                    No matching sub categories under {selectedMainCategory?.name}
                   </div>
                 )}
               </div>
