@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect, SearchableSelectOption } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { parseMapboxAddress } from "@/lib/directory/utils";
+import { convertToHHmm, parseMapboxAddress } from "@/lib/directory/utils";
 import { cn } from "@/lib/utils";
 
 type Section = "schedule" | "access" | "tickets";
@@ -93,6 +93,8 @@ function timezoneOptions(current: string): SearchableSelectOption[] {
   return values.map((value) => ({ value, label: value.replaceAll("_", " ") }));
 }
 
+const TIME_FORMAT = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
 function isHttpsUrl(value: string | null | undefined): boolean {
   // Draft fields are typed as `string`, but the API can genuinely return
   // null for a URL field the server previously cleared (e.g. purchase
@@ -110,12 +112,19 @@ function errorFor(field: EventField, draft: EventDraft): string | undefined {
     case "event_end_date":
       if (!draft.event_end_date) return "Select the event end date.";
       return draft.event_start_date && draft.event_end_date < draft.event_start_date ? "End date cannot be before the start date." : undefined;
-    case "event_start_time": return draft.is_all_day ? undefined : required("Select the event start time.");
-    case "event_end_time":
+    case "event_start_time": {
+      if (draft.is_all_day) return undefined;
+      const requiredMsg = required("Select the event start time.");
+      if (requiredMsg) return requiredMsg;
+      return TIME_FORMAT.test(draft.event_start_time) ? undefined : "Format must be HH:mm (24h).";
+    }
+    case "event_end_time": {
       if (draft.is_all_day) return undefined;
       if (!draft.event_end_time) return "Select the event end time.";
+      if (!TIME_FORMAT.test(draft.event_end_time)) return "Format must be HH:mm (24h).";
       return draft.event_start_date === draft.event_end_date && draft.event_start_time && draft.event_end_time <= draft.event_start_time
         ? "For a same-day event, the end time must be later than the start time." : undefined;
+    }
     case "timezone": return required("Select the timezone used for the event times.");
     case "event_location": return required("Select whether the event is in person, online, or hybrid.");
     case "event_venue": return ["in_person", "hybrid"].includes(draft.event_location) ? required("Enter the venue name.") : undefined;
@@ -248,10 +257,10 @@ export const EventStepForm = forwardRef<ListingFormHandle, Props>(({ listingSlug
     });
   };
 
-  const validateSection = (): boolean => {
+  const validateSection = (draftOverride: EventDraft = draft): boolean => {
     const nextErrors: FieldErrors = {};
     for (const field of SECTION_FIELDS[section]) {
-      const message = errorFor(field, draft);
+      const message = errorFor(field, draftOverride);
       if (message) nextErrors[field] = message;
     }
     setTouched((current) => ({ ...current, ...Object.fromEntries(SECTION_FIELDS[section].map((field) => [field, true])) }));
@@ -285,7 +294,16 @@ export const EventStepForm = forwardRef<ListingFormHandle, Props>(({ listingSlug
   };
 
   const save = async (): Promise<boolean> => {
-    if (!validateSection()) return false;
+    // Normalize before validating so any non-canonical time string a native
+    // time input's fallback text-entry mode could hand back (e.g. "2:30 PM"
+    // on a browser/webview that doesn't implement type="time") is coerced to
+    // HH:mm before format checks and the same-day ordering comparison run.
+    const normalizedDraft: EventDraft = section === "schedule" && !draft.is_all_day
+      ? { ...draft, event_start_time: convertToHHmm(draft.event_start_time), event_end_time: convertToHHmm(draft.event_end_time) }
+      : draft;
+    if (normalizedDraft !== draft) setDraft(normalizedDraft);
+
+    if (!validateSection(normalizedDraft)) return false;
 
     if (section === "tickets" && draft.pricing_mode === "multiple") {
       const flushed = await ticketTypeEditorRef.current?.flushPendingChanges();
@@ -295,10 +313,10 @@ export const EventStepForm = forwardRef<ListingFormHandle, Props>(({ listingSlug
     let payload: Record<string, unknown>;
     if (section === "schedule") {
       payload = {
-        event_start_date: draft.event_start_date, event_end_date: draft.event_end_date,
-        event_start_time: draft.is_all_day ? null : draft.event_start_time,
-        event_end_time: draft.is_all_day ? null : draft.event_end_time,
-        timezone: draft.timezone, is_all_day: draft.is_all_day,
+        event_start_date: normalizedDraft.event_start_date, event_end_date: normalizedDraft.event_end_date,
+        event_start_time: normalizedDraft.is_all_day ? null : normalizedDraft.event_start_time,
+        event_end_time: normalizedDraft.is_all_day ? null : normalizedDraft.event_end_time,
+        timezone: normalizedDraft.timezone, is_all_day: normalizedDraft.is_all_day,
       };
     } else if (section === "access") {
       payload = {

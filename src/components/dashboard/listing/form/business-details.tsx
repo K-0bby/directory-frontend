@@ -91,8 +91,18 @@ export const DetailsFormSchema = z
       }),
     event_start_date: z.string().optional(),
     event_end_date: z.string().optional(),
-    event_start_time: z.string().optional(),
-    event_end_time: z.string().optional(),
+    event_start_time: z
+      .string()
+      .optional()
+      .refine((val) => !val || /^([01]\d|2[0-3]):([0-5]\d)$/.test(val), {
+        message: "Format must be HH:mm (24h)",
+      }),
+    event_end_time: z
+      .string()
+      .optional()
+      .refine((val) => !val || /^([01]\d|2[0-3]):([0-5]\d)$/.test(val), {
+        message: "Format must be HH:mm (24h)",
+      }),
     event_location: z.string().optional(),
     event_type: z.string().optional(),
     timezone: z.string().optional(),
@@ -478,6 +488,9 @@ export const BusinessDetailsForm = forwardRef<ListingFormHandle, Props>(
           return false;
         }
       } else {
+        setValue("event_start_time", convertToHHmm(form.getValues("event_start_time")));
+        setValue("event_end_time", convertToHHmm(form.getValues("event_end_time")));
+
         const isValid = await trigger([
           "event_venue",
           "address",
