@@ -125,7 +125,6 @@ export const ListingExperienceForm = forwardRef<ListingFormHandle, Props>(({ lis
     if (listingType === "business" && hoursMode === "scheduled") {
       const enabled = hours.filter((day) => day.enabled);
       if (enabled.length === 0) next.opening_hours = "Add at least one day of scheduled opening hours.";
-      else if (enabled.some((day) => day.endTime <= day.startTime)) next.opening_hours = "Each closing time must be later than its opening time.";
     }
     if (listingType === "community" && !participation.trim()) next.community_participation_method = "Explain how people can join, attend, contact, or follow this community.";
     setErrors(next);
