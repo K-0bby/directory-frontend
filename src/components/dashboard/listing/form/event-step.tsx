@@ -145,9 +145,11 @@ function errorFor(field: EventField, draft: EventDraft): string | undefined {
       if (draft.attendance_type !== "paid" || draft.purchase_method !== "external_url") return undefined;
       return isHttpsUrl(draft.event_ticket_url) ? undefined : "Enter a public HTTPS event, ticket, or checkout URL.";
     case "event_price":
-      if (draft.pricing_mode !== "fixed") return undefined;
+      if (draft.attendance_type !== "paid" || draft.pricing_mode !== "fixed") return undefined;
       return draft.event_price !== "" && Number(draft.event_price) >= 0 ? undefined : "Enter a price of zero or more.";
-    case "event_currency": return draft.pricing_mode === "fixed" || draft.pricing_mode === "multiple" ? required("Select the ticket currency.") : undefined;
+    case "event_currency":
+      return draft.attendance_type === "paid" && (draft.pricing_mode === "fixed" || draft.pricing_mode === "multiple")
+        ? required("Select the ticket currency.") : undefined;
     case "ticket_availability_message": return draft.admission_availability === "coming_soon" ? required("Tell visitors when or how tickets will become available.") : undefined;
     default: return undefined;
   }
@@ -337,11 +339,11 @@ export const EventStepForm = forwardRef<ListingFormHandle, Props>(({ listingSlug
         registration_url: draft.registration_url || null,
         pricing_mode: isPaid ? (draft.pricing_mode || null) : null,
         purchase_method: isPaid ? (draft.purchase_method || null) : null,
-        purchase_instructions: draft.purchase_method === "pay_at_venue" || draft.purchase_method === "contact_organizer" ? (draft.purchase_instructions || null) : null,
-        event_ticket_url: draft.purchase_method === "external_url" ? (draft.event_ticket_url || null) : null,
-        event_price: draft.pricing_mode === "fixed" ? (draft.event_price || null) : null,
-        event_currency: draft.pricing_mode === "fixed" || draft.pricing_mode === "multiple" ? (draft.event_currency || null) : null,
-        ticket_provider: draft.purchase_method === "external_url" ? (draft.ticket_provider || null) : null,
+        purchase_instructions: isPaid && (draft.purchase_method === "pay_at_venue" || draft.purchase_method === "contact_organizer") ? (draft.purchase_instructions || null) : null,
+        event_ticket_url: isPaid && draft.purchase_method === "external_url" ? (draft.event_ticket_url || null) : null,
+        event_price: isPaid && draft.pricing_mode === "fixed" ? (draft.event_price || null) : null,
+        event_currency: isPaid && (draft.pricing_mode === "fixed" || draft.pricing_mode === "multiple") ? (draft.event_currency || null) : null,
+        ticket_provider: isPaid && draft.purchase_method === "external_url" ? (draft.ticket_provider || null) : null,
         ticket_release_at: isComingSoon ? (draft.ticket_release_at || null) : null,
         ticket_availability_message: isComingSoon ? (draft.ticket_availability_message || null) : null,
       };
