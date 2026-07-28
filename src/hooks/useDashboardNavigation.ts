@@ -36,7 +36,13 @@ const MENU_CONFIG: MenuItem[] = [
     title: "My Listings",
     url: "/dashboard/my-listing",
     icon: "/images/icons/listings.svg",
-    roles: ["vendor", "listing_agent"],
+    roles: ["vendor"],
+  },
+  {
+    title: "Agent Workspace",
+    url: "/dashboard/agent",
+    icon: "/images/icons/listings.svg",
+    roles: ["listing_agent"],
   },
   {
     title: "Listings",
@@ -57,6 +63,12 @@ const MENU_CONFIG: MenuItem[] = [
   {
     title: "Claims",
     url: "/dashboard/claim",
+    icon: Files,
+    roles: ["admin"],
+  },
+  {
+    title: "Agent Operations",
+    url: "/dashboard/agent-operations",
     icon: Files,
     roles: ["admin"],
   },
