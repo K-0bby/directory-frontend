@@ -98,6 +98,8 @@ export default function Users() {
     custom_date: "",
   });
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://me-fie.co.uk";
+
   const getAuthToken = useCallback((): string | null => {
     return typeof window !== "undefined"
       ? localStorage.getItem("authToken")
@@ -128,7 +130,7 @@ export default function Users() {
         return;
       }
 
-      const response = await fetch("/api/all_users", {
+      const response = await fetch(`${API_URL}/api/all_users`, {
         method: "GET",
         headers: {
           Accept: "application/json",
@@ -146,50 +148,16 @@ export default function Users() {
     } finally {
       setIsLoading(false);
     }
-  }, [authLoading, getAuthToken, extractUsersFromResponse]);
+  }, [authLoading, API_URL, getAuthToken, extractUsersFromResponse]);
 
   useEffect(() => {
     if (!authLoading && authUser) loadAllData();
   }, [authUser, authLoading, loadAllData]);
 
-  const handleRoleChange = async (targetUser: User, newRole: string) => {
-    if (targetUser.role === newRole) return;
+  const handleRoleChange = async (userId: string, newRole: string) => {
     setIsActionLoading(true);
     try {
       const token = getAuthToken();
-
-      if (targetUser.role === "listing_agent") {
-        const reason = window.prompt(
-          "Why is listing-agent access being removed? This takes effect immediately and ends active stewardship.",
-        )?.trim();
-        if (!reason) throw new Error("A removal reason is required.");
-
-        const removal = await fetch(
-          `/api/admin/users/${targetUser.id}/remove_listing_agent`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Accept: "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ reason }),
-          },
-        );
-        const removalData = await removal.json().catch(() => ({}));
-        if (!removal.ok) {
-          throw new Error(
-            removalData.message ||
-              removalData.error ||
-              "Failed to remove listing-agent access",
-          );
-        }
-        toast.success(
-          "Listing-agent access removed. The backend selected the safe contextual replacement role.",
-        );
-        await loadAllData();
-        return;
-      }
 
       // Mapping internal UI role values to API endpoint suffixes
       const endpointSuffixMap: Record<string, string> = {
@@ -202,30 +170,15 @@ export default function Users() {
 
       const suffix = endpointSuffixMap[newRole];
       if (!suffix) throw new Error("Invalid role selection");
-      const promotionReason =
-        newRole === "listing_agent"
-          ? window
-              .prompt(
-                "Why is this verified, eligible customer being promoted to listing agent?",
-              )
-              ?.trim()
-          : undefined;
-      if (newRole === "listing_agent" && !promotionReason) {
-        throw new Error("A promotion reason is required.");
-      }
 
-      const res = await fetch(
-        `/api/admin/users/${targetUser.id}/role/${suffix}`,
-        {
+      const res = await fetch(`${API_URL}/api/users/${userId}/${suffix}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
         },
-          body: JSON.stringify({ reason: promotionReason }),
-        },
-      );
+      });
 
       if (!res.ok) {
         const errorData = await res.json();
@@ -263,7 +216,7 @@ export default function Users() {
       };
 
       const res = await fetch(
-        `/api/admin/users/${selectedUser.id}/suspension/suspend`,
+        `${API_URL}/api/users/${selectedUser.id}/suspend`,
         {
           method: "POST",
           headers: {
@@ -290,7 +243,7 @@ export default function Users() {
     setIsActionLoading(true);
     try {
       const token = getAuthToken();
-      const res = await fetch(`/api/admin/users/${user.id}/suspension/unsuspend`, {
+      const res = await fetch(`${API_URL}/api/users/${user.id}/unsuspend`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -550,7 +503,7 @@ export default function Users() {
                           <Select
                             disabled={isActionLoading}
                             value={u.role}
-                            onValueChange={(val) => handleRoleChange(u, val)}
+                            onValueChange={(val) => handleRoleChange(u.id, val)}
                           >
                             <SelectTrigger className="w-[100px] h-8 text-xs shadow-none border-gray-300 focus:ring-0 rounded-full">
                               <SelectValue />

@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import "./globals.css";
+// import Navbar from "@/components/ui/navbar";
+// import Footer from "@/components/ui/footer";
 import LayoutWrapper from "@/components/layout-wrapper";
-import { ProductionAnalytics } from "@/components/analytics/production-analytics";
-import { CookieConsent } from "@/components/ui/cookie-consent";
-import { Toaster } from "@/components/ui/sonner";
-import { WhatsAppFloater } from "@/components/whatsapp-floater";
 import { AuthProvider } from "@/context/auth-context";
+import { Toaster } from "@/components/ui/sonner";
 import { BookmarkProvider } from "@/context/bookmark-context";
-import { getProductionAnalyticsConfig } from "@/lib/analytics/config";
+import { CookieConsent } from "@/components/ui/cookie-consent";
+import { WhatsAppFloater } from "@/components/whatsapp-floater";
+// import MicrosoftClarity from "@/components/analytics/microsoft-clarity";
+import Script from "next/script";
 
 const gilroy = localFont({
   src: [
@@ -26,7 +29,7 @@ const gilroy = localFont({
   display: "swap",
 });
 
-export const siteMetadata: Metadata = {
+export const metadata: Metadata = {
   metadataBase: new URL("https://www.mefiedirectory.com"),
   title: {
     template: "%s | Me-fie Directory",
@@ -34,6 +37,7 @@ export const siteMetadata: Metadata = {
   },
   description:
     "Mefie Directory | Discover Ghanaian Businesses, Events & Services Worldwide Discover trusted Ghanaian businesses, cultural events, communities, and services across the diaspora and beyond. Connect, promote, and grow with Mefie Directory.",
+
   keywords: [
     "Me-fie Directory",
     "African owned businesses",
@@ -124,32 +128,43 @@ export const siteMetadata: Metadata = {
   },
 };
 
-interface AppRootShellProps {
-  children: React.ReactNode;
-  includeClarity: boolean;
-  routeScope: "public" | "private";
-}
-
-export function AppRootShell({
+export default function RootLayout({
   children,
-  includeClarity,
-  routeScope,
-}: AppRootShellProps) {
-  const analytics = getProductionAnalyticsConfig(includeClarity);
-
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script
+          type="text/javascript"
+          id="microsoft-clarity"
+          strategy="afterInteractive"
+        >
+          {` (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "x8jgxrd7kq");`}
+        </Script>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-L1GY8G7FVN"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-L1GY8G7FVN');
+          `}
+        </Script>
+      </head>
       <body className={`${gilroy.variable} antialiased`}>
-        {analytics ? (
-          <ProductionAnalytics
-            allowedHosts={analytics.allowedHosts}
-            clarityProjectId={analytics.clarityProjectId}
-            gaMeasurementId={analytics.gaMeasurementId}
-            routeScope={routeScope}
-          />
-        ) : null}
+        {/* <Navbar /> */}
         <AuthProvider>
           <BookmarkProvider>
+            {/* <MicrosoftClarity /> */}
             <LayoutWrapper>{children}</LayoutWrapper>
             <CookieConsent />
             <WhatsAppFloater />
@@ -169,6 +184,7 @@ export function AppRootShell({
             />
           </BookmarkProvider>
         </AuthProvider>
+        {/* <Footer /> */}
       </body>
     </html>
   );
