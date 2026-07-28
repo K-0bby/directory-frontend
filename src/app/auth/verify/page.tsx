@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import VerifyOtp from "../signup/_component/verify-otp";
+import VerifyOtp from "@/app/auth/signup/_component/verify-otp";
 import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";

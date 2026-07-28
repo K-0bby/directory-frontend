@@ -11,16 +11,13 @@ export async function PATCH(
   try {
     const { claim_id } = await params;
     const authHeader = request.headers.get("Authorization");
-    const body = await request.text();
 
     const response = await fetch(`${API_BASE_URL}/api/admin/claims/${claim_id}/approve`, {
       method: "PATCH",
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/json",
         ...(authHeader && { Authorization: authHeader }),
       },
-      body,
     });
 
     const data = await response.json().catch(() => ({}));

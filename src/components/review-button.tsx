@@ -185,7 +185,6 @@ function ReviewItem({
               <Divider />
               <div className="space-y-3 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
                 <Textarea
-                  data-clarity-mask="true"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   placeholder={`Replying to ${review.author}...`}
@@ -386,7 +385,6 @@ export function ReviewsSection({ reviews, listingSlug, isOwner = false, readOnly
               <div className="space-y-3">
                 <p className="text-sm font-bold text-gray-700">Your review</p>
                 <Textarea
-                  data-clarity-mask="true"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   maxLength={500}
