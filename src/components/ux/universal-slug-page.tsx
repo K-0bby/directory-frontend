@@ -36,12 +36,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { ReviewsSection } from "@/components/review-button";
+import { ReviewsSection } from "@/components/ux/review-button";
 
 // Imported Components
-import { MediaGallery, Lightbox } from "@/components/media-gallery";
-import { HeroCarousel } from "@/components/hero-slide";
-import { BookmarkButton } from "@/components/bookmark-button";
+import { MediaGallery, Lightbox } from "@/components/ux/media-gallery";
+import { HeroCarousel } from "@/components/ux/hero-slide";
+import { BookmarkButton } from "@/components/ux/bookmark-button";
 import { RichTextDisplay } from "@/components/ui/rich-text-editor";
 import { useAuth } from "@/context/auth-context";
 import { ClaimEligibility, getClaimEligibility } from "@/lib/api";
@@ -53,6 +53,7 @@ interface ApiImage {
   original?: string;
   thumb?: string;
   webp?: string;
+  card?: string;
   mime_type?: string;
   file_size?: number;
   size?: string;
@@ -201,6 +202,9 @@ interface ApiListingData {
   is_verified?: boolean;
   claim_status?: string;
   images?: (ApiImage | string)[];
+  cover?: ApiImage | null;
+  primary_image?: string;
+  cover_image?: string;
   socials?: ApiSocialItem[];
   services?: any[];
   faqs?: FAQItem[];
@@ -1547,6 +1551,30 @@ export default function UniversalSlugPage({
               alt: "Placeholder",
             };
           });
+
+          // The explicit cover always wins over whichever image happens to be
+          // first in `images` — keeps this page in sync with what listing
+          // cards elsewhere show for the same listing.
+          const explicitCover =
+            listingData.cover?.card ||
+            listingData.cover?.webp ||
+            listingData.cover?.original ||
+            listingData.primary_image ||
+            listingData.cover_image;
+          if (explicitCover) {
+            const coverSrc = getImageUrl(explicitCover);
+            const coverIndex = gallery.findIndex((g) => g.src === coverSrc);
+            if (coverIndex > 0) {
+              const [cover] = gallery.splice(coverIndex, 1);
+              gallery.unshift(cover);
+            } else if (coverIndex === -1) {
+              gallery.unshift({
+                type: "image",
+                src: coverSrc,
+                alt: provider.name,
+              });
+            }
+          }
 
           // The canonical media shape excludes videos from `images` (they must
           // never reach image components) — surface gallery videos explicitly.

@@ -3,8 +3,9 @@
 
 import { useState, useEffect, Suspense, useRef, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import NavigationTab from "@/components/navigation-tab";
-import SearchHeader from "@/components/search-header";
+import { useQueryState, parseAsString } from "nuqs";
+import NavigationTab from "@/components/ux/navigation-tab";
+import SearchHeader from "@/components/ux/search-header";
 import BusinessCardCarousel from "@/components/discover/business-card-carousel";
 import EventCardCarousel from "@/components/discover/event-card-carousel";
 import EditorialCarousel from "@/components/discover/editorial-carousel";
@@ -139,8 +140,17 @@ function DiscoverContent() {
 
   const filterCountry = searchParams.get("country");
   const filterQuery = searchParams.get("q");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // Backed by the same "event_start_date"/"event_end_date" URL params that
+  // SearchHeader writes, so the filter survives refresh/back-forward instead
+  // of always starting cleared.
+  const [dateFrom, setDateFrom] = useQueryState(
+    "event_start_date",
+    parseAsString.withDefault(""),
+  );
+  const [dateTo, setDateTo] = useQueryState(
+    "event_end_date",
+    parseAsString.withDefault(""),
+  );
 
   useEffect(() => {
     const mapListings = (data: ApiListing[]) => {

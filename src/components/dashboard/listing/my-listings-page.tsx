@@ -35,6 +35,7 @@ interface ListingImage {
   original: string;
   thumb: string;
   webp: string;
+  card?: string;
   mime_type?: string;
 }
 
@@ -62,6 +63,9 @@ interface ApiListing {
   creator_status?: string;
   type?: string;
   images: ListingImage[];
+  cover?: ListingImage | null;
+  primary_image?: string;
+  cover_image?: string;
   categories: Category[];
   rating: number;
   ratings_count: number;
@@ -294,10 +298,23 @@ export default function MyListingsPage() {
             .filter((img) => !!img.original)
             .map((img) => getImageUrl(img.original));
 
-          const coverImage =
-            validImages.length > 0
+          // The explicit cover always wins over whichever image happens to
+          // be first in `images` — keeps this table in sync with what every
+          // other page shows.
+          const explicitCover =
+            listing.cover?.card ||
+            listing.cover?.webp ||
+            listing.cover?.original ||
+            listing.primary_image ||
+            listing.cover_image;
+          const coverImage = explicitCover
+            ? getImageUrl(explicitCover)
+            : validImages.length > 0
               ? validImages[0]
               : getImageUrl("/images/no-image.jpg");
+          const orderedImages = explicitCover
+            ? [coverImage, ...validImages.filter((url) => url !== coverImage)]
+            : validImages;
 
           const categoryText = formatCategoryPath(
             listing.categories,
@@ -331,7 +348,7 @@ export default function MyListingsPage() {
             slug: listing.slug,
             name: listing.name,
             image: coverImage,
-            allImages: validImages,
+            allImages: orderedImages,
             category: categoryText,
             location: location,
             status: status,

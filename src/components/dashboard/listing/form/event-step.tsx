@@ -450,25 +450,29 @@ export const EventStepForm = forwardRef<ListingFormHandle, Props>(({ listingSlug
     {section === "access" && <>
       <div><h2 className="text-2xl font-semibold">Location / online access</h2><p className="text-sm text-muted-foreground">Choose the format first; only relevant fields will be required.</p></div>
       <Field label="Event format" error={errors.event_location}>
-        <Select value={draft.event_location} onValueChange={(value) => selectField("event_location", value as EventFormat)}><SelectTrigger data-event-field="event_location" aria-invalid={!!errors.event_location} className={cn(errors.event_location && "border-red-500")}><SelectValue placeholder="Select format" /></SelectTrigger><SelectContent><SelectItem value="in_person">In person</SelectItem><SelectItem value="online">Online</SelectItem><SelectItem value="hybrid">Hybrid</SelectItem></SelectContent></Select>
+        <Select value={draft.event_location} onValueChange={(value) => selectField("event_location", value as EventFormat)}><SelectTrigger data-event-field="event_location" aria-invalid={!!errors.event_location} className={cn("w-full", errors.event_location && "border-red-500")}><SelectValue placeholder="Select format" /></SelectTrigger><SelectContent><SelectItem value="in_person">In person</SelectItem><SelectItem value="online">Online</SelectItem><SelectItem value="hybrid">Hybrid</SelectItem></SelectContent></Select>
       </Field>
       {(draft.event_location === "in_person" || draft.event_location === "hybrid") && <div className="space-y-4 rounded-xl border p-4">
-        <Field label="Venue" error={errors.event_venue}><Input data-event-field="event_venue" aria-invalid={!!errors.event_venue} className={cn(errors.event_venue && "border-red-500")} value={draft.event_venue} onBlur={() => touch("event_venue")} onChange={(event) => update("event_venue", event.target.value)} placeholder="Venue or building name" /></Field>
-        <Field label="Country" error={errors.event_country}><div data-event-field="event_country" tabIndex={-1}><CountryDropdown defaultValue={draft.event_country} onChange={changeCountry} placeholder="Search for a country" className={cn("rounded-lg", errors.event_country && "border-red-500")} /></div></Field>
-        <Field label="Venue address" error={errors.event_venue_address}>
-          <div className="relative">
-            {mapboxToken && selectedCountryCode ? <AddressAutofill accessToken={mapboxToken} options={{ country: selectedCountryCode }} popoverOptions={{ placement: "bottom-start", flip: true, offset: 6 }} onSuggestError={() => setMapboxUnavailable(true)} onRetrieve={handleRetrieve}>
-              <Input name="event_venue_address" data-event-field="event_venue_address" autoComplete="address-line1" aria-invalid={!!errors.event_venue_address} className={cn("pr-10", errors.event_venue_address && "border-red-500")} value={draft.event_venue_address} onBlur={() => touch("event_venue_address")} onChange={(event) => changeVenueAddress(event.target.value)} placeholder="Start typing the venue address" />
-            </AddressAutofill> : <Input data-event-field="event_venue_address" disabled={!draft.event_country} aria-invalid={!!errors.event_venue_address} className={cn("pr-10", errors.event_venue_address && "border-red-500")} value={draft.event_venue_address} onBlur={() => touch("event_venue_address")} onChange={(event) => update("event_venue_address", event.target.value)} placeholder={draft.event_country ? "Enter the venue address" : "Select a country first"} />}
-            <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          </div>
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Venue" error={errors.event_venue}><Input data-event-field="event_venue" aria-invalid={!!errors.event_venue} className={cn(errors.event_venue && "border-red-500")} value={draft.event_venue} onBlur={() => touch("event_venue")} onChange={(event) => update("event_venue", event.target.value)} placeholder="Venue or building name" /></Field>
+          <Field label="Country" error={errors.event_country}><div data-event-field="event_country" tabIndex={-1}><CountryDropdown defaultValue={draft.event_country} onChange={changeCountry} placeholder="Search for a country" className={cn("rounded-lg", errors.event_country && "border-red-500")} /></div></Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Venue address" error={errors.event_venue_address}>
+            <div className="relative">
+              {mapboxToken && selectedCountryCode ? <AddressAutofill accessToken={mapboxToken} options={{ country: selectedCountryCode }} popoverOptions={{ placement: "bottom-start", flip: true, offset: 6 }} onSuggestError={() => setMapboxUnavailable(true)} onRetrieve={handleRetrieve}>
+                <Input name="event_venue_address" data-event-field="event_venue_address" autoComplete="address-line1" aria-invalid={!!errors.event_venue_address} className={cn("pr-10", errors.event_venue_address && "border-red-500")} value={draft.event_venue_address} onBlur={() => touch("event_venue_address")} onChange={(event) => changeVenueAddress(event.target.value)} placeholder="Start typing the venue address" />
+              </AddressAutofill> : <Input data-event-field="event_venue_address" disabled={!draft.event_country} aria-invalid={!!errors.event_venue_address} className={cn("pr-10", errors.event_venue_address && "border-red-500")} value={draft.event_venue_address} onBlur={() => touch("event_venue_address")} onChange={(event) => update("event_venue_address", event.target.value)} placeholder={draft.event_country ? "Enter the venue address" : "Select a country first"} />}
+              <MapPin className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+          </Field>
+          <Field label="City" error={errors.event_city}><Input data-event-field="event_city" autoComplete="shipping address-level2" aria-invalid={!!errors.event_city} className={cn(errors.event_city && "border-red-500")} value={draft.event_city} onBlur={() => touch("event_city")} onChange={(event) => update("event_city", event.target.value)} placeholder="City" /></Field>
+        </div>
         {mapboxUnavailable && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800" role="status">Address suggestions are temporarily unavailable. You can still enter the address and city manually.</p>}
-        <Field label="City" error={errors.event_city}><Input data-event-field="event_city" autoComplete="shipping address-level2" aria-invalid={!!errors.event_city} className={cn(errors.event_city && "border-red-500")} value={draft.event_city} onBlur={() => touch("event_city")} onChange={(event) => update("event_city", event.target.value)} placeholder="City" /></Field>
         {mapboxToken && minimapFeature && <div className="h-40 overflow-hidden rounded-xl border"><AddressMinimap show feature={minimapFeature} accessToken={mapboxToken} /></div>}
       </div>}
       {(draft.event_location === "online" || draft.event_location === "hybrid") && <div className="space-y-4 rounded-xl border p-4">
-        <Field label="Online access plan" error={errors.online_access_policy} warning={warningFor("online_access_policy", draft, hasContactMethod)}><Select value={draft.online_access_policy} onValueChange={(value) => selectField("online_access_policy", value as AccessPolicy)}><SelectTrigger data-event-field="online_access_policy" aria-invalid={!!errors.online_access_policy} className={cn(errors.online_access_policy && "border-red-500")}><SelectValue placeholder="Choose access plan" /></SelectTrigger><SelectContent><SelectItem value="public_link">Public link</SelectItem><SelectItem value="sent_after_registration">Sent after registration</SelectItem><SelectItem value="shared_later">Shared later</SelectItem></SelectContent></Select></Field>
+        <Field label="Online access plan" error={errors.online_access_policy} warning={warningFor("online_access_policy", draft, hasContactMethod)}><Select value={draft.online_access_policy} onValueChange={(value) => selectField("online_access_policy", value as AccessPolicy)}><SelectTrigger data-event-field="online_access_policy" aria-invalid={!!errors.online_access_policy} className={cn("w-full", errors.online_access_policy && "border-red-500")}><SelectValue placeholder="Choose access plan" /></SelectTrigger><SelectContent><SelectItem value="public_link">Public link</SelectItem><SelectItem value="sent_after_registration">Sent after registration</SelectItem><SelectItem value="shared_later">Shared later</SelectItem></SelectContent></Select></Field>
         {draft.online_access_policy === "public_link" && <Field label="Public online URL" error={errors.event_online_url} hint="Use a complete HTTPS link."><Input data-event-field="event_online_url" type="url" maxLength={2048} aria-invalid={!!errors.event_online_url} className={cn(errors.event_online_url && "border-red-500")} value={draft.event_online_url} onBlur={() => touch("event_online_url")} onChange={(event) => update("event_online_url", event.target.value)} placeholder="https://…" /></Field>}
         <Field label="Access instructions (optional)"><textarea className="min-h-24 w-full rounded-md border p-3 text-sm" value={draft.online_access_instructions} onChange={(event) => update("online_access_instructions", event.target.value)} /></Field>
       </div>}
@@ -476,29 +480,63 @@ export const EventStepForm = forwardRef<ListingFormHandle, Props>(({ listingSlug
 
     {section === "tickets" && <>
       <div><h2 className="text-2xl font-semibold">Registration & tickets</h2><p className="text-sm text-muted-foreground">Choose the visitor experience that applies now.</p></div>
-      <Field label="Attendance" error={errors.attendance_type}><Select value={draft.attendance_type} onValueChange={(value) => selectField("attendance_type", value as Attendance)}><SelectTrigger data-event-field="attendance_type" aria-invalid={!!errors.attendance_type} className={cn(errors.attendance_type && "border-red-500")}><SelectValue placeholder="Choose attendance type" /></SelectTrigger><SelectContent><SelectItem value="free_no_registration">Free — no registration</SelectItem><SelectItem value="free_registration_required">Free — registration required</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select></Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Attendance" error={errors.attendance_type}><Select value={draft.attendance_type} onValueChange={(value) => selectField("attendance_type", value as Attendance)}><SelectTrigger data-event-field="attendance_type" aria-invalid={!!errors.attendance_type} className={cn("w-full", errors.attendance_type && "border-red-500")}><SelectValue placeholder="Choose attendance type" /></SelectTrigger><SelectContent><SelectItem value="free_no_registration">Free — no registration</SelectItem><SelectItem value="free_registration_required">Free — registration required</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select></Field>
 
-      <Field label="Admission availability" error={errors.admission_availability} hint="Lets visitors know whether admission is open right now.">
-        <Select value={draft.admission_availability} onValueChange={(value) => selectField("admission_availability", value as AdmissionAvailability)}>
-          <SelectTrigger data-event-field="admission_availability" aria-invalid={!!errors.admission_availability} className={cn(errors.admission_availability && "border-red-500")}><SelectValue placeholder="Choose current availability" /></SelectTrigger>
-          <SelectContent><SelectItem value="available">Available</SelectItem><SelectItem value="coming_soon">Coming soon</SelectItem><SelectItem value="closed">Closed</SelectItem><SelectItem value="sold_out">Sold out</SelectItem></SelectContent>
-        </Select>
-      </Field>
+        <Field label="Admission availability" error={errors.admission_availability} hint="Lets visitors know whether admission is open right now.">
+          <Select value={draft.admission_availability} onValueChange={(value) => selectField("admission_availability", value as AdmissionAvailability)}>
+            <SelectTrigger data-event-field="admission_availability" aria-invalid={!!errors.admission_availability} className={cn("w-full", errors.admission_availability && "border-red-500")}><SelectValue placeholder="Choose current availability" /></SelectTrigger>
+            <SelectContent><SelectItem value="available">Available</SelectItem><SelectItem value="coming_soon">Coming soon</SelectItem><SelectItem value="closed">Closed</SelectItem><SelectItem value="sold_out">Sold out</SelectItem></SelectContent>
+          </Select>
+        </Field>
+      </div>
 
       {draft.attendance_type === "free_registration_required" && <Field label="Registration URL" error={errors.registration_url} hint="Use a complete HTTPS registration link."><Input data-event-field="registration_url" type="url" maxLength={2048} aria-invalid={!!errors.registration_url} className={cn(errors.registration_url && "border-red-500")} value={draft.registration_url} onBlur={() => touch("registration_url")} onChange={(event) => update("registration_url", event.target.value)} placeholder="https://…" /></Field>}
 
       {draft.attendance_type === "paid" && <div className="space-y-4">
         <Field label="Pricing mode" error={errors.pricing_mode}>
           <Select value={draft.pricing_mode} onValueChange={(value) => selectField("pricing_mode", value as PricingMode)}>
-            <SelectTrigger data-event-field="pricing_mode" aria-invalid={!!errors.pricing_mode} className={cn(errors.pricing_mode && "border-red-500")}><SelectValue placeholder="Choose pricing mode" /></SelectTrigger>
+            <SelectTrigger data-event-field="pricing_mode" aria-invalid={!!errors.pricing_mode} className={cn("w-full", errors.pricing_mode && "border-red-500")}><SelectValue placeholder="Choose pricing mode" /></SelectTrigger>
             <SelectContent><SelectItem value="fixed">Fixed price</SelectItem><SelectItem value="multiple">Multiple ticket types</SelectItem><SelectItem value="varies">Prices vary</SelectItem></SelectContent>
           </Select>
         </Field>
 
-        {draft.pricing_mode === "fixed" && <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Price" error={errors.event_price}><Input data-event-field="event_price" type="number" min="0" step="0.01" aria-invalid={!!errors.event_price} className={cn(errors.event_price && "border-red-500")} value={draft.event_price} onBlur={() => touch("event_price")} onChange={(event) => update("event_price", event.target.value)} /></Field>
-          <Field label="Currency" error={errors.event_currency}><SearchableSelect fieldName="event_currency" value={draft.event_currency} options={CURRENCIES} onChange={(value) => selectField("event_currency", value)} placeholder="Select currency" searchPlaceholder="Search code or currency…" invalid={!!errors.event_currency} /></Field>
-        </div>}
+        {draft.pricing_mode === "fixed" && (
+          <Field label="Price">
+            <div
+              className={cn(
+                "flex items-stretch overflow-hidden rounded-lg border border-input bg-background",
+                "focus-within:border-[#93c01f] focus-within:ring-[3px] focus-within:ring-[#93c01f]/20",
+                (errors.event_price || errors.event_currency) && "border-red-500",
+              )}
+            >
+              <SearchableSelect
+                fieldName="event_currency"
+                value={draft.event_currency}
+                options={CURRENCIES}
+                onChange={(value) => selectField("event_currency", value)}
+                placeholder="Currency"
+                searchPlaceholder="Search code or currency…"
+                invalid={!!errors.event_currency}
+                className="h-10 w-28 shrink-0 justify-between rounded-none border-0 border-r border-input bg-transparent px-3 shadow-none focus-visible:ring-0"
+              />
+              <Input
+                data-event-field="event_price"
+                type="number"
+                min="0"
+                step="0.01"
+                aria-invalid={!!errors.event_price}
+                className="h-10 flex-1 rounded-none border-0 shadow-none focus-visible:ring-0"
+                value={draft.event_price}
+                onBlur={() => touch("event_price")}
+                onChange={(event) => update("event_price", event.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            {errors.event_price && <p className="text-xs text-red-600" role="alert">{errors.event_price}</p>}
+            {!errors.event_price && errors.event_currency && <p className="text-xs text-red-600" role="alert">{errors.event_currency}</p>}
+          </Field>
+        )}
 
         {draft.pricing_mode === "multiple" && <>
           <Field label="Currency" error={errors.event_currency} hint="Applies to every ticket type below."><SearchableSelect fieldName="event_currency" value={draft.event_currency} options={CURRENCIES} onChange={(value) => selectField("event_currency", value)} placeholder="Select currency" searchPlaceholder="Search code or currency…" invalid={!!errors.event_currency} /></Field>
@@ -509,7 +547,7 @@ export const EventStepForm = forwardRef<ListingFormHandle, Props>(({ listingSlug
 
         <Field label="Purchase method" error={errors.purchase_method} warning={warningFor("purchase_method", draft, hasContactMethod)}>
           <Select value={draft.purchase_method} onValueChange={(value) => selectField("purchase_method", value as PurchaseMethod)}>
-            <SelectTrigger data-event-field="purchase_method" aria-invalid={!!errors.purchase_method} className={cn(errors.purchase_method && "border-red-500")}><SelectValue placeholder="Choose purchase method" /></SelectTrigger>
+            <SelectTrigger data-event-field="purchase_method" aria-invalid={!!errors.purchase_method} className={cn("w-full", errors.purchase_method && "border-red-500")}><SelectValue placeholder="Choose purchase method" /></SelectTrigger>
             <SelectContent><SelectItem value="external_url">External ticket website</SelectItem><SelectItem value="pay_at_venue">Pay at venue</SelectItem><SelectItem value="contact_organizer">Contact organizer</SelectItem></SelectContent>
           </Select>
         </Field>

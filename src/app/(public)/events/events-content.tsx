@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import EventSectionCarousel from "@/components/event-section-carousel";
+import EventSectionCarousel from "@/components/ux/event-section-carousel";
 import EventCarousel from "@/components/events/event-carousel";
-import { EventCard } from "@/components/event-card";
+import { EventCard } from "@/components/ux/event-card";
 import { Button } from "@/components/ui/button";
 import { DirectoryPageShell } from "@/components/directory/directory-page-shell";
 import { useDirectoryListings } from "@/lib/directory/use-directory-listings";

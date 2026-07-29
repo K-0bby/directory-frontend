@@ -1,8 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsInteger,
+  parseAsIsoDate,
+} from "nuqs";
 import {
   Search,
   MoreHorizontal,
@@ -146,12 +152,39 @@ export default function ReviewsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Filters & Pagination
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [ratingFilter, setRatingFilter] = useState("All");
-  const [date, setDate] = useState<DateRange | undefined>(undefined);
+  const [search, setSearch] = useQueryState(
+    "search",
+    parseAsString.withDefault(""),
+  );
+  const [statusFilter, setStatusFilter] = useQueryState(
+    "status",
+    parseAsString.withDefault("All"),
+  );
+  const [ratingFilter, setRatingFilter] = useQueryState(
+    "rating",
+    parseAsString.withDefault("All"),
+  );
+  const [dateFrom, setDateFrom] = useQueryState("from", parseAsIsoDate);
+  const [dateTo, setDateTo] = useQueryState("to", parseAsIsoDate);
+  const date: DateRange | undefined = useMemo(
+    () =>
+      dateFrom || dateTo
+        ? { from: dateFrom ?? undefined, to: dateTo ?? undefined }
+        : undefined,
+    [dateFrom, dateTo],
+  );
+  const setDate = useCallback(
+    (range: DateRange | undefined) => {
+      setDateFrom(range?.from ?? null);
+      setDateTo(range?.to ?? null);
+    },
+    [setDateFrom, setDateTo],
+  );
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useQueryState(
+    "page",
+    parseAsInteger.withDefault(1),
+  );
   const [totalPages, setTotalPages] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; slug: string } | null>(null);
 

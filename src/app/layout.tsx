@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import LayoutWrapper from "@/components/layout-wrapper";
+import "./globals.css";
+import LayoutWrapper from "@/components/ux/layout-wrapper";
 import { ProductionAnalytics } from "@/components/analytics/production-analytics";
 import { CookieConsent } from "@/components/ui/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
-import { WhatsAppFloater } from "@/components/whatsapp-floater";
-import { AuthProvider } from "@/context/auth-context";
-import { BookmarkProvider } from "@/context/bookmark-context";
+import { WhatsAppFloater } from "@/components/ux/whatsapp-floater";
+import { AppProviders } from "@/providers";
 import { getProductionAnalyticsConfig } from "@/lib/analytics/config";
 
 const gilroy = localFont({
@@ -26,7 +26,7 @@ const gilroy = localFont({
   display: "swap",
 });
 
-export const siteMetadata: Metadata = {
+export const metadata: Metadata = {
   metadataBase: new URL("https://www.mefiedirectory.com"),
   title: {
     template: "%s | Me-fie Directory",
@@ -124,18 +124,16 @@ export const siteMetadata: Metadata = {
   },
 };
 
-interface AppRootShellProps {
-  children: React.ReactNode;
-  includeClarity: boolean;
-  routeScope: "public" | "private";
-}
-
-export function AppRootShell({
+export default function RootLayout({
   children,
-  includeClarity,
-  routeScope,
-}: AppRootShellProps) {
-  const analytics = getProductionAnalyticsConfig(includeClarity);
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  // Always resolved with Clarity included — ProductionAnalytics itself
+  // decides whether to actually load Clarity, based on which route it's
+  // currently rendering on (see resolveRouteScope there). A single shared
+  // root layout has no per-route-group prop to gate this with anymore.
+  const analytics = getProductionAnalyticsConfig(true);
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -145,30 +143,27 @@ export function AppRootShell({
             allowedHosts={analytics.allowedHosts}
             clarityProjectId={analytics.clarityProjectId}
             gaMeasurementId={analytics.gaMeasurementId}
-            routeScope={routeScope}
           />
         ) : null}
-        <AuthProvider>
-          <BookmarkProvider>
-            <LayoutWrapper>{children}</LayoutWrapper>
-            <CookieConsent />
-            <WhatsAppFloater />
-            <Toaster
-              closeButton
-              visibleToasts={3}
-              duration={4000}
-              position="top-center"
-              toastOptions={{
-                classNames: {
-                  toast: "!rounded-xl !shadow-lg !text-sm !font-medium !gap-2",
-                  title: "!font-semibold",
-                  description: "!text-xs !opacity-80",
-                  closeButton: "!rounded-lg",
-                },
-              }}
-            />
-          </BookmarkProvider>
-        </AuthProvider>
+        <AppProviders>
+          <LayoutWrapper>{children}</LayoutWrapper>
+          <CookieConsent />
+          <WhatsAppFloater />
+          <Toaster
+            closeButton
+            visibleToasts={3}
+            duration={4000}
+            position="top-center"
+            toastOptions={{
+              classNames: {
+                toast: "!rounded-xl !shadow-lg !text-sm !font-medium !gap-2",
+                title: "!font-semibold",
+                description: "!text-xs !opacity-80",
+                closeButton: "!rounded-lg",
+              },
+            }}
+          />
+        </AppProviders>
       </body>
     </html>
   );

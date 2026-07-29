@@ -2,13 +2,13 @@
 "use client";
 
 import { useState, useMemo, Suspense, useEffect } from "react";
-import ScrollableCategoryTabs from "@/components/scrollable-category-tabs";
-import SearchHeader from "@/components/search-header";
+import ScrollableCategoryTabs from "@/components/ux/scrollable-category-tabs";
+import SearchHeader from "@/components/ux/search-header";
 import BusinessSection from "@/components/business/business-section";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import EventSectionCarousel from "@/components/event-section-carousel";
+import EventSectionCarousel from "@/components/ux/event-section-carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 

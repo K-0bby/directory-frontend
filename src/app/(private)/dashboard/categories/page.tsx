@@ -1,5 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsStringEnum,
+} from "nuqs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -150,10 +155,21 @@ function CategoriesPageContent() {
   const { loading: authLoading } = useAuth();
 
   const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [view, setView] = useState<"active" | "archived">("active");
-  const [selectedMainSlug, setSelectedMainSlug] = useState<string | null>(null);
-  const [searchMainCategory, setSearchMainCategory] = useState("");
-  const [searchSubCategory, setSearchSubCategory] = useState("");
+  const [view, setView] = useQueryState(
+    "view",
+    parseAsStringEnum<"active" | "archived">(["active", "archived"]).withDefault(
+      "active",
+    ),
+  );
+  const [selectedMainSlug, setSelectedMainSlug] = useQueryState("main");
+  const [searchMainCategory, setSearchMainCategory] = useQueryState(
+    "q_main",
+    parseAsString.withDefault(""),
+  );
+  const [searchSubCategory, setSearchSubCategory] = useQueryState(
+    "q_sub",
+    parseAsString.withDefault(""),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 

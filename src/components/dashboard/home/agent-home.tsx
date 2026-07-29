@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQueryState, parseAsStringEnum } from "nuqs";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -65,7 +66,12 @@ function claimBadgeClass(state: AgentClaimState): string {
 export default function AgentHome() {
   const [metrics, setMetrics] = useState<AgentMetrics | null>(null);
   const [listings, setListings] = useState<AgentWorkListing[]>([]);
-  const [filter, setFilter] = useState<WorkFilter>("all");
+  const [filter, setFilter] = useQueryState(
+    "filter",
+    parseAsStringEnum<WorkFilter>(FILTERS.map((f) => f.value)).withDefault(
+      "all",
+    ),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

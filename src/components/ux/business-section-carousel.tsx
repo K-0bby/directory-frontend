@@ -9,7 +9,7 @@ import {
   BusinessCard,
   type Business as BusinessCardBusiness,
 } from "./business-card";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 
 interface BusinessSectionCarouselProps {

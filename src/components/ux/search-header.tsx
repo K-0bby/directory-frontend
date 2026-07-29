@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import { useSearchParams, usePathname } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
+import { useQueryState, parseAsString, debounce } from "nuqs";
 import { Calendar, ChevronDown } from "lucide-react";
 import {
   Select,
@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import SearchDropdown from "@/components/search-dropdown";
+import { format, parse } from "date-fns";
+import SearchDropdown from "@/components/ux/search-dropdown";
 import type { DateRange } from "react-day-picker";
 import { CountryDropdown, Country } from "@/components/ui/country-dropdown";
 import { countries as allCountries } from "country-data-list";
@@ -118,9 +118,28 @@ export default function SearchHeader({
   onSearchChange,
   onDateRangeChange,
 }: SearchHeaderProps) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [categoryIdQ, setCategoryIdQ] = useQueryState(
+    "category_id",
+    parseAsString.withDefault(""),
+  );
+  const [countryQ, setCountryQ] = useQueryState(
+    "country",
+    parseAsString.withDefault(""),
+  );
+  const [, setQParam] = useQueryState(
+    "q",
+    parseAsString
+      .withDefault("")
+      .withOptions({ limitUrlUpdates: debounce(500) }),
+  );
+  const [eventStartDate, setEventStartDate] = useQueryState(
+    "event_start_date",
+    parseAsString.withDefault(""),
+  );
+  const [eventEndDate, setEventEndDate] = useQueryState(
+    "event_end_date",
+    parseAsString.withDefault(""),
+  );
 
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [countryOptions, setCountryOptions] = useState<Country[] | undefined>(
@@ -232,45 +251,15 @@ export default function SearchHeader({
       });
   }, []);
 
-  // Update the URL via `window.history.replaceState` rather than
-  // `router.push`. Since Next.js 14.1+, `useSearchParams()` subscribes to
-  // native history events, so filter-reading hooks still react to the
-  // change — but the server component wrapping the page is NOT re-run,
-  // which is what was causing the "refresh" on every keystroke.
-  const writeParams = (mutate: (params: URLSearchParams) => void) => {
-    const params = new URLSearchParams(searchParams.toString());
-    mutate(params);
-    const qs = params.toString();
-    const url = qs ? `${pathname}?${qs}` : pathname;
-    window.history.replaceState(null, "", url);
-  };
-
-  const updateSearchParams = (key: string, value: string) => {
-    writeParams((p) => {
-      if (value) p.set(key, value);
-      else p.delete(key);
-    });
-  };
-
-  const updateSearchParamsBatch = (updates: Record<string, string>) => {
-    writeParams((p) => {
-      for (const [key, value] of Object.entries(updates)) {
-        if (value) p.set(key, value);
-        else p.delete(key);
-      }
-    });
-  };
-
   const handleSearchChange = (value: string) => {
     if (onSearchChange) {
       // In-memory filtering — no URL update, no navigation
       onSearchChange(value);
     } else {
-      // Fallback: update URL param for pages that rely on it
-      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-      searchDebounceRef.current = setTimeout(() => {
-        updateSearchParams("q", value);
-      }, 500);
+      // Fallback: update URL param for pages that rely on it. The 500ms
+      // debounce lives on the URL commit itself (nuqs `limitUrlUpdates`)
+      // rather than a manual setTimeout.
+      setQParam(value || null);
     }
   };
 
@@ -278,31 +267,42 @@ export default function SearchHeader({
     if (onCountryChange) {
       onCountryChange(country);
     } else {
-      updateSearchParams("country", country?.name || "");
+      setCountryQ(country?.name || null);
     }
   };
 
   const handleCategoryChange = (value: string) => {
-    updateSearchParams("category_id", value === "all" ? "" : value);
+    setCategoryIdQ(value === "all" ? null : value);
   };
 
   const isMobile = useIsMobile();
   const [datePickerOpen, setDatePickerOpen] = useState(false);
-  const [selectedRange, setSelectedRange] = useState<DateRange | undefined>(
-    undefined,
-  );
+  // Derived from the URL-backed event_start_date/event_end_date params so
+  // the picker correctly reflects a shared/bookmarked/refreshed URL instead
+  // of always starting empty.
+  const selectedRange: DateRange | undefined = useMemo(() => {
+    if (!eventStartDate && !eventEndDate) return undefined;
+    return {
+      from: eventStartDate
+        ? parse(eventStartDate, "yyyy-MM-dd", new Date())
+        : undefined,
+      to: eventEndDate
+        ? parse(eventEndDate, "yyyy-MM-dd", new Date())
+        : undefined,
+    };
+  }, [eventStartDate, eventEndDate]);
 
   const handleDateRangeSelect = (range: DateRange | undefined) => {
-    setSelectedRange(range);
     const start = range?.from ? format(range.from, "yyyy-MM-dd") : "";
     const end = range?.to ? format(range.to, "yyyy-MM-dd") : "";
-    updateSearchParamsBatch({ event_start_date: start, event_end_date: end });
+    setEventStartDate(start || null);
+    setEventEndDate(end || null);
     onDateRangeChange?.(start, end);
   };
 
   const handleClearDates = () => {
-    setSelectedRange(undefined);
-    updateSearchParamsBatch({ event_start_date: "", event_end_date: "" });
+    setEventStartDate(null);
+    setEventEndDate(null);
     onDateRangeChange?.("", "");
   };
 
@@ -310,7 +310,7 @@ export default function SearchHeader({
   const showCategories = context !== "discover";
   const showDate = context === "discover" || context === "events";
 
-  const currentCategory = searchParams.get("category_id") || "all";
+  const currentCategory = categoryIdQ || "all";
   const currentCategoryLabel = useMemo(
     () =>
       categories.find((c) => c.value === currentCategory)?.label ||
@@ -338,9 +338,7 @@ export default function SearchHeader({
                 // Prefer the URL-selected country so the dropdown visibly
                 // reflects the active filter across re-renders; fall back to
                 // the geolocation-detected country on first load.
-                defaultValue={
-                  searchParams.get("country") || detectedCountry || undefined
-                }
+                defaultValue={countryQ || detectedCountry || undefined}
                 onChange={handleCountrySelect}
                 placeholder="Select country"
                 slim={false}
@@ -357,7 +355,9 @@ export default function SearchHeader({
                 const triggerBtn = (
                   <Button
                     variant="outline"
-                    onClick={isMobile ? () => setDatePickerOpen(true) : undefined}
+                    onClick={
+                      isMobile ? () => setDatePickerOpen(true) : undefined
+                    }
                     className={`h-9 w-full rounded-full px-4 justify-start font-normal ${
                       selectedRange?.from
                         ? "border-[#275782] bg-[#275782]/5 text-[#275782]"
@@ -380,10 +380,18 @@ export default function SearchHeader({
                   return (
                     <>
                       {triggerBtn}
-                      <Sheet open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-                        <SheetContent side="bottom" className="rounded-t-2xl px-0 pb-6">
+                      <Sheet
+                        open={datePickerOpen}
+                        onOpenChange={setDatePickerOpen}
+                      >
+                        <SheetContent
+                          side="bottom"
+                          className="rounded-t-2xl px-0 pb-6"
+                        >
                           <SheetHeader className="px-5 pb-2">
-                            <SheetTitle className="text-base font-semibold">Select Date Range</SheetTitle>
+                            <SheetTitle className="text-base font-semibold">
+                              Select Date Range
+                            </SheetTitle>
                           </SheetHeader>
                           <div className="flex justify-center overflow-x-auto px-4">
                             <CalendarComponent
@@ -397,7 +405,10 @@ export default function SearchHeader({
                             <Button
                               variant="outline"
                               className="flex-1"
-                              onClick={() => { handleClearDates(); setDatePickerOpen(false); }}
+                              onClick={() => {
+                                handleClearDates();
+                                setDatePickerOpen(false);
+                              }}
                             >
                               Clear
                             </Button>

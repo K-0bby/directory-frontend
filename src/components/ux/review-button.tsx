@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Star, Loader2, Reply } from "lucide-react";
 import { useState } from "react";
-import { Textarea } from "./ui/textarea";
+import { Textarea } from "../ui/textarea";
 import { toast } from "sonner";
 import { usePathname } from "next/navigation";
 import Image from "next/image";

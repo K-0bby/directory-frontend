@@ -1,16 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+import {
+  useQueryStates,
+  parseAsString,
+  parseAsStringEnum,
+  parseAsInteger,
+} from "nuqs";
 import { countries } from "country-data-list";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Country, CountryDropdown } from "@/components/ui/country-dropdown";
-import { BusinessCard } from "@/components/business-card";
-import { EventCard } from "@/components/event-card";
+import { BusinessCard } from "@/components/ux/business-card";
+import { EventCard } from "@/components/ux/event-card";
 import CommunityCard from "@/components/communities/community-card";
-import { processImages, formatDateTime } from "@/lib/directory/image-utils";
+import {
+  processImages,
+  formatDateTime,
+  resolveCoverUrl,
+} from "@/lib/directory/image-utils";
 import { pickDisplayCategory, type ApiListing } from "@/lib/directory/types";
 import type {
   CategoryLandingListingType,
@@ -38,6 +48,7 @@ function canonicalHref(item: ApiListing): string {
 
 function listingImage(item: ApiListing): string {
   return processImages(item.images, [
+    resolveCoverUrl(item.cover),
     item.primary_image,
     item.image,
     item.cover_image,
@@ -152,11 +163,11 @@ function SectionGrid({
           <h2 className="text-2xl font-semibold text-gray-900 lg:text-3xl">
             {section.title}
           </h2> */}
-          <h2 className="text-2xl font-semibold text-gray-900 lg:text-3xl">
-            Best {typeLabel(section.type)}
-          </h2>
+        <h2 className="text-2xl font-semibold text-gray-900 lg:text-3xl">
+          Best {typeLabel(section.type)}
+        </h2>
 
-          {/* <p className="mt-1 text-sm text-gray-500">
+        {/* <p className="mt-1 text-sm text-gray-500">
             {section.total} {section.total === 1 ? "listing" : "listings"} found
           </p>
         </div> */}
@@ -249,8 +260,6 @@ function PageSkeleton() {
 
 export default function CategoryPageContent() {
   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [data, setData] = useState<CategoryLandingResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -261,23 +270,20 @@ export default function CategoryPageContent() {
     return index !== -1 ? segments[index + 1] || "" : "";
   }, [pathname]);
 
-  const selectedSubcategory = searchParams.get("subcategory") || "";
-  const selectedType = searchParams.get(
-    "type",
-  ) as CategoryLandingListingType | null;
-  const selectedCountry = searchParams.get("country") || "";
-  const currentPage = Number(searchParams.get("page") || "1");
-
-  const writeParams = useCallback(
-    (mutate: (params: URLSearchParams) => void) => {
-      const params = new URLSearchParams(searchParams.toString());
-      mutate(params);
-      const qs = params.toString();
-      const url = qs ? `${pathname}?${qs}` : pathname;
-      router.replace(url, { scroll: false });
+  const [
+    {
+      subcategory: selectedSubcategory,
+      type: selectedType,
+      country: selectedCountry,
+      page: currentPage,
     },
-    [pathname, router, searchParams],
-  );
+    setCategoryParams,
+  ] = useQueryStates({
+    subcategory: parseAsString.withDefault(""),
+    type: parseAsStringEnum<CategoryLandingListingType>(TYPES),
+    country: parseAsString.withDefault(""),
+    page: parseAsInteger.withDefault(1),
+  });
 
   useEffect(() => {
     if (!categorySlug) return;
@@ -385,41 +391,23 @@ export default function CategoryPageContent() {
     )
       return;
 
-    writeParams((params) => {
-      params.delete("subcategory");
-      params.delete("type");
-      params.delete("page");
-    });
-  }, [data, selectedSubcategory, writeParams]);
+    setCategoryParams({ subcategory: null, type: null, page: null });
+  }, [data, selectedSubcategory, setCategoryParams]);
 
   const handleSubcategoryChange = (slug: string) => {
-    writeParams((params) => {
-      if (slug) params.set("subcategory", slug);
-      else params.delete("subcategory");
-      params.delete("type");
-      params.delete("page");
-    });
+    setCategoryParams({ subcategory: slug || null, type: null, page: null });
   };
 
   const handleCountryChange = (country: Country | null) => {
-    writeParams((params) => {
-      if (country?.name) params.set("country", country.name);
-      else params.delete("country");
-      params.delete("page");
-    });
+    setCategoryParams({ country: country?.name || null, page: null });
   };
 
   const handleSeeMore = (type: CategoryLandingListingType) => {
-    writeParams((params) => {
-      params.set("type", type);
-      params.set("page", "1");
-    });
+    setCategoryParams({ type, page: 1 });
   };
 
   const handlePageChange = (page: number) => {
-    writeParams((params) => {
-      params.set("page", String(page));
-    });
+    setCategoryParams({ page });
   };
 
   if (isLoading && !data) return <PageSkeleton />;
@@ -503,10 +491,7 @@ export default function CategoryPageContent() {
               type="button"
               variant="outline"
               onClick={() => {
-                writeParams((params) => {
-                  params.delete("type");
-                  params.delete("page");
-                });
+                setCategoryParams({ type: null, page: null });
               }}
               className="w-fit rounded-full"
             >

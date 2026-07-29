@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { EventCard, type Event } from "../event-card";
+import { EventCard, type Event } from "../ux/event-card";
 import { Button } from "../ui/button";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 

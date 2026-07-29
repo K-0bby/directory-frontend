@@ -1,21 +1,23 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import { useQueryState, parseAsString } from "nuqs";
 import HeroSlider from "@/components/landing-page/hero-slider";
-// import { Sort, SortOption } from "@/components/sort";
+// import { Sort, SortOption } from "@/components/ux/sort";
 import { BusinessCarousel } from "@/components/landing-page/business-carousel";
 import { DirectoryEventCarousel } from "@/components/landing-page/directory-event-carousel";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Faqs } from "@/components/landing-page/faqs";
-import { BusinessCard } from "../business-card";
-import { EventCard } from "@/components/event-card";
+import { BusinessCard } from "../ux/business-card";
+import { EventCard } from "@/components/ux/event-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { CountryDropdown, Country } from "@/components/ui/country-dropdown";
 import { countries as allCountries } from "country-data-list";
 import { stripHtml } from "@/lib/utils";
 import { ListingCoverMedia } from "@/components/directory/listing-cover-media";
+import { processImages, resolveCoverUrl } from "@/lib/directory/image-utils";
 
 // Types
 export type Business = (typeof BusinessCard)["prototype"]["props"]["business"];
@@ -66,6 +68,7 @@ interface ApiListing {
   country?: string;
   status: string;
   images: (ApiImage | string)[];
+  cover?: ApiImage | null;
   primary_image?: string;
   cover_image?: string;
   categories: ApiCategory[];
@@ -81,16 +84,6 @@ interface ApiListing {
   event_price?: string | null;
   event_currency?: string | null;
 }
-
-// --- Helper: Robust URL Generator ---
-const getImageUrl = (url: string | undefined | null): string => {
-  if (!url) return "/images/no-image.jpg";
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url;
-  }
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://me-fie.co.uk";
-  return `${API_URL}/${url.replace(/^\//, "")}`;
-};
 
 // --- UPDATED: Aggressive Classifier Logic ---
 const classifyListing = (
@@ -122,7 +115,10 @@ export default function HomeContent() {
   const [topCategories, setTopCategories] = useState<TopCategory[]>([]);
   const [isTopCatsLoading, setIsTopCatsLoading] = useState(true);
   const [detectedCountry, setDetectedCountry] = useState<string>("");
-  const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const [selectedCountry, setSelectedCountry] = useQueryState(
+    "country",
+    parseAsString.withDefault(""),
+  );
   const [countryOptions, setCountryOptions] = useState<Country[] | undefined>(
     undefined,
   );
@@ -243,32 +239,14 @@ export default function HomeContent() {
         const communities: Community[] = [];
 
         data.forEach((item) => {
-          // --- Image Logic ---
-          const rawImages = Array.isArray(item.images) ? item.images : [];
-
-          const validImages = rawImages
-            .filter((img: string | ApiImage) => {
-              if (typeof img === "string") return !!img;
-              return !!(img && typeof img === "object" && img.original);
-            })
-            .map((img: string | ApiImage) => {
-              const mediaPath =
-                typeof img === "string"
-                  ? img
-                  : img.card || img.webp || img.original;
-              return getImageUrl(mediaPath);
-            });
-
-          // Fallbacks
-          if (validImages.length === 0 && item.primary_image) {
-            validImages.push(getImageUrl(item.primary_image));
-          }
-          if (validImages.length === 0 && item.cover_image) {
-            validImages.push(getImageUrl(item.cover_image));
-          }
-          if (validImages.length === 0) {
-            validImages.push("/images/no-image.jpg");
-          }
+          // Backend's explicit cover always wins over whatever happens to be
+          // first in `images` — keeps the card in sync with what other pages
+          // show for the same listing.
+          const validImages = processImages(item.images, [
+            resolveCoverUrl(item.cover),
+            item.primary_image,
+            item.cover_image,
+          ]);
 
           const categoryName = item.categories?.[0]?.name || "General";
           const listingType = classifyListing(item);

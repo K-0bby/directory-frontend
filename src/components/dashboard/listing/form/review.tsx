@@ -19,7 +19,6 @@ import {
   YoutubeLogo,
   TiktokLogo,
   WhatsappLogo,
-  Eye,
 } from "@phosphor-icons/react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -205,6 +204,9 @@ export const ReviewSubmitStep = forwardRef<ListingFormHandle, Props>(
           return false;
         }
       },
+      openPreview() {
+        setPreviewOpen(true);
+      },
     }));
 
     if (loading) {
@@ -252,23 +254,11 @@ export const ReviewSubmitStep = forwardRef<ListingFormHandle, Props>(
 
     return (
       <div className="space-y-6 py-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold mb-1">Preview & Submit for review</h2>
-            <p className="text-sm text-muted-foreground">
-              Review your public listing and resolve required items before sending it to the moderation team.
-            </p>
-          </div>
-          {listingData && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPreviewOpen(true)}
-              className="shrink-0"
-            >
-              <Eye className="h-4 w-4" /> Preview as visitor
-            </Button>
-          )}
+        <div>
+          <h2 className="text-xl font-semibold mb-1">Preview & Submit for review</h2>
+          <p className="text-sm text-muted-foreground">
+            Review your public listing and resolve required items before sending it to the moderation team.
+          </p>
         </div>
 
         {listingData?.status === "rejected" && listingData.status_reason && (
