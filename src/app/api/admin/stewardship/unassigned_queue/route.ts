@@ -4,5 +4,6 @@ import { proxyLaravelJson } from "@/lib/bff/proxy-laravel";
 export async function GET(request: NextRequest) {
   return proxyLaravelJson(request, {
     path: "admin/stewardship/unassigned_queue",
+    includeSearch: true,
   });
 }

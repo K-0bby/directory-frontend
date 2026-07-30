@@ -74,9 +74,28 @@ const MENU_CONFIG: MenuItem[] = [
   },
   {
     title: "Agent Operations",
-    url: "/dashboard/agent-operations",
     icon: Files,
     roles: ["admin"],
+    children: [
+      {
+        title: "Stewardship Queue",
+        url: "/dashboard/agent-operations/stewardship",
+        icon: Files,
+        roles: ["admin"],
+      },
+      {
+        title: "Listing Revisions",
+        url: "/dashboard/agent-operations/revisions",
+        icon: Files,
+        roles: ["admin"],
+      },
+      {
+        title: "Duplicate Collisions",
+        url: "/dashboard/agent-operations/duplicates",
+        icon: Files,
+        roles: ["admin"],
+      },
+    ],
   },
 
   // ─── Categories (Admin) ───

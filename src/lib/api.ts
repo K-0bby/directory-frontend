@@ -1865,6 +1865,30 @@ export interface AdminDuplicateAssessment {
   created_at: string;
 }
 
+export interface OperationsPaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface PaginatedOperationsResponse<T> {
+  data: T[];
+  links: {
+    first: string | null;
+    last: string | null;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: OperationsPaginationMeta;
+}
+
+export interface OperationsQuery {
+  q?: string;
+  page?: number;
+  perPage?: number;
+}
+
 function agentAuthHeaders(token?: string): HeadersInit {
   return {
     Accept: "application/json",
@@ -2022,20 +2046,28 @@ export async function createListingInternalNote(
   return payload.data;
 }
 
+function operationsParams(query: OperationsQuery): URLSearchParams {
+  const params = new URLSearchParams({
+    page: String(query.page ?? 1),
+    per_page: String(query.perPage ?? 20),
+  });
+  if (query.q?.trim()) params.set("q", query.q.trim());
+  return params;
+}
+
 export async function getAdminStewardshipQueue(
   token?: string,
-): Promise<AdminStewardshipQueueItem[]> {
-  const response = await fetch("/api/admin/stewardship/unassigned_queue", {
+  query: OperationsQuery = {},
+): Promise<PaginatedOperationsResponse<AdminStewardshipQueueItem>> {
+  const params = operationsParams(query);
+  const response = await fetch(`/api/admin/stewardship/unassigned_queue?${params}`, {
     headers: agentAuthHeaders(token),
     cache: "no-store",
   });
   if (!response.ok) {
     throw await lifecycleApiError(response, "Could not load stewardship queue");
   }
-  const payload = (await response.json()) as {
-    data: AdminStewardshipQueueItem[];
-  };
-  return payload.data;
+  return response.json() as Promise<PaginatedOperationsResponse<AdminStewardshipQueueItem>>;
 }
 
 export async function getEligibleStewardshipAgents(
@@ -2076,16 +2108,17 @@ export async function assignListingSteward(
 
 export async function getAdminPendingRevisions(
   token?: string,
-): Promise<AdminPendingRevision[]> {
-  const response = await fetch("/api/admin/revisions", {
+  query: OperationsQuery = {},
+): Promise<PaginatedOperationsResponse<AdminPendingRevision>> {
+  const params = operationsParams(query);
+  const response = await fetch(`/api/admin/revisions?${params}`, {
     headers: agentAuthHeaders(token),
     cache: "no-store",
   });
   if (!response.ok) {
     throw await lifecycleApiError(response, "Could not load pending revisions");
   }
-  const payload = (await response.json()) as { data: AdminPendingRevision[] };
-  return payload.data;
+  return response.json() as Promise<PaginatedOperationsResponse<AdminPendingRevision>>;
 }
 
 export async function decideAdminListingRevision(
@@ -2193,8 +2226,10 @@ export async function submitListingContentRevision(
 
 export async function getAdminDuplicateAssessments(
   token?: string,
-): Promise<AdminDuplicateAssessment[]> {
-  const response = await fetch("/api/admin/duplicate_assessments", {
+  query: OperationsQuery = {},
+): Promise<PaginatedOperationsResponse<AdminDuplicateAssessment>> {
+  const params = operationsParams(query);
+  const response = await fetch(`/api/admin/duplicate_assessments?${params}`, {
     headers: agentAuthHeaders(token),
     cache: "no-store",
   });
@@ -2204,10 +2239,7 @@ export async function getAdminDuplicateAssessments(
       "Could not load duplicate assessments",
     );
   }
-  const payload = (await response.json()) as {
-    data: AdminDuplicateAssessment[];
-  };
-  return payload.data;
+  return response.json() as Promise<PaginatedOperationsResponse<AdminDuplicateAssessment>>;
 }
 
 export async function resolveAdminDuplicateAssessment(

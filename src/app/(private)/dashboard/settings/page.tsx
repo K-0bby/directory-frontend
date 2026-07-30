@@ -2,9 +2,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import {
-  Eye,
-  EyeOff,
-  // Info,
   Trash,
   Loader2,
   CheckCircle,
@@ -34,6 +31,14 @@ import {
   ProfileSettingsApiError,
   updateUserProfile,
 } from "@/lib/api";
+import {
+  SettingsButton as Button,
+  SettingsCard as Card,
+  SettingsCardContent as CardContent,
+  SettingsCardHeader as CardHeader,
+  SettingsInput as Input,
+  SettingsLabel as Label,
+} from "@/components/dashboard/settings/account-settings-primitives";
 
 // Phone Input Imports
 import { PhoneInput } from "react-international-phone";
@@ -76,115 +81,6 @@ const TabLink = ({
         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-lime-600" />
       )}
     </Link>
-  );
-};
-
-const Card = ({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => {
-  return (
-    <div className={`bg-white border border-gray-200 ${className}`}>
-      {children}
-    </div>
-  );
-};
-
-const CardHeader = ({ children }: { children: React.ReactNode }) => {
-  return <div className="p-6 pb-4">{children}</div>;
-};
-
-const CardContent = ({ children }: { children: React.ReactNode }) => {
-  return <div className="px-6 pb-6">{children}</div>;
-};
-
-const Input = ({
-  type = "text",
-  placeholder,
-  className = "",
-  showEyeIcon = false,
-  value,
-  onChange,
-  name,
-}: {
-  type?: string;
-  placeholder?: string;
-  className?: string;
-  showEyeIcon?: boolean;
-  value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  name?: string;
-}) => {
-  const [showPassword, setShowPassword] = useState(false);
-  const inputType = showEyeIcon && showPassword ? "text" : type;
-
-  return (
-    <div className="relative">
-      <input
-        type={inputType}
-        name={name}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-lime-500 focus:border-transparent ${className}`}
-      />
-      {showEyeIcon && (
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-        >
-          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-        </button>
-      )}
-    </div>
-  );
-};
-
-const Label = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <label className="block text-sm font-medium text-gray-900 mb-1.5">
-      {children}
-    </label>
-  );
-};
-
-const Button = ({
-  children,
-  variant = "default",
-  disabled = false,
-  className = "",
-  onClick,
-  isLoading = false,
-}: {
-  children: React.ReactNode;
-  variant?: "default" | "outline" | "button";
-  disabled?: boolean;
-  className?: string;
-  onClick?: () => void;
-  isLoading?: boolean;
-}) => {
-  const baseStyles =
-    "px-6 py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2";
-  const variantStyles =
-    variant === "outline"
-      ? "bg-white border border-red-400 text-red-500 hover:bg-red-50"
-      : disabled || isLoading
-        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-        : "bg-lime-500 text-white hover:bg-lime-600";
-
-  return (
-    <button
-      disabled={disabled || isLoading}
-      onClick={onClick}
-      className={`${baseStyles} ${variantStyles} ${className}`}
-    >
-      {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-      {children}
-    </button>
   );
 };
 
