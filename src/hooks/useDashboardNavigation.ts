@@ -45,6 +45,12 @@ const MENU_CONFIG: MenuItem[] = [
     roles: ["listing_agent"],
   },
   {
+    title: "My Listings",
+    url: "/dashboard/agent/listings",
+    icon: "/images/icons/listings.svg",
+    roles: ["listing_agent"],
+  },
+  {
     title: "Listings",
     url: "/dashboard/listings",
     icon: "/images/icons/listings.svg",
@@ -173,7 +179,7 @@ const MENU_CONFIG: MenuItem[] = [
     title: "Settings",
     url: "/dashboard/settings",
     icon: "/images/icons/setting.svg",
-    roles: ["vendor", "customer"],
+    roles: ["vendor", "customer", "listing_agent"],
   },
 ];
 

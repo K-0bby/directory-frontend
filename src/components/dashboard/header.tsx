@@ -64,6 +64,8 @@ export default function Header() {
   // --- Role Check Logic ---
   const isAdmin = currentUser?.role?.toLowerCase() === "admin";
   const isVendor = currentUser?.role?.toLowerCase() === "vendor"; // Assuming 'vendor' is the role string
+  const isListingAgent =
+    currentUser?.role?.toLowerCase() === "listing_agent";
 
   // --- State ---
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -92,7 +94,7 @@ export default function Header() {
 
   const getDashboardUrl = () => {
     if (!user) return "/auth/login";
-    return "/dashboard";
+    return "/dashboard/settings";
   };
 
   // --- API Actions ---
@@ -399,21 +401,23 @@ export default function Header() {
                   Profile Settings
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link
-                  href={`${settingsBaseUrl}?tab=billing`}
-                  className="flex items-center gap-2 cursor-pointer py-2.5"
-                >
-                  <Image
-                    src="/images/icons/billing.svg"
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="opacity-70"
-                  />
-                  Billing & Subscriptions
-                </Link>
-              </DropdownMenuItem>
+              {!isListingAgent && (
+                <DropdownMenuItem asChild>
+                  <Link
+                    href={`${settingsBaseUrl}?tab=billing`}
+                    className="flex items-center gap-2 cursor-pointer py-2.5"
+                  >
+                    <Image
+                      src="/images/icons/billing.svg"
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="opacity-70"
+                    />
+                    Billing & Subscriptions
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <Link
                   href="/help"

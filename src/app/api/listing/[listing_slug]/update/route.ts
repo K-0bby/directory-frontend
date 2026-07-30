@@ -27,7 +27,11 @@ async function handleUpdate(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return NextResponse.json(
-        { error: errorData.message || 'Failed to update listing', errors: errorData.errors },
+        {
+          message: errorData.message || 'Failed to update listing',
+          error: errorData.error || errorData.message || 'Failed to update listing',
+          errors: errorData.errors,
+        },
         { status: response.status }
       );
     }

@@ -12,6 +12,7 @@ import { installSessionExpiryInterceptor } from "@/lib/session";
 interface User {
   id: string;
   phone: string;
+  country_code?: string;
   last_name: string;
   first_name: string;
   email: string;
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           last_name: raw?.last_name || "",
           first_name: raw?.first_name || "",
           phone: raw?.phone || "",
+          country_code: raw?.country_code || "",
         };
 
         setUser(mappedUser);

@@ -3,16 +3,16 @@ import { readFileSync } from "node:fs";
 
 const BASELINE = {
   all: {
-    count: 196,
-    sha256: "56bb1cc0d70f7b96edc2da3d5a420c9d83350318ef60a61bd0fd1c55e2663782",
+    count: 198,
+    sha256: "f69d84255f49c73423c29176b152bdd368db499a9083cefeb2301fa8a261a0c3",
   },
   pages: {
-    count: 57,
-    sha256: "031a14117c2d528442b8cc27d02ea08e10e01306545d466f11fcd5576ee06716",
+    count: 58,
+    sha256: "23a4800052e70cc16f5b3c55eb7a59f53b61a6e68b7c1370dfcb5dadfc2b65fe",
   },
   api: {
-    count: 139,
-    sha256: "b9f5e8cbec051b36622537d84aa0ebf3053611890717c7e7e2bd925209434383",
+    count: 140,
+    sha256: "3b12573c29acbc33210c4e8ca9a46470624a59a8023c5b7bca5d06542eb2779f",
   },
 };
 

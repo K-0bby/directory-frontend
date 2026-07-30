@@ -15,7 +15,7 @@ export default function DashboardHome() {
   const router = useRouter();
   const role = normalizeRole(user?.role ?? "customer");
 
-  // Listing agents have no home — redirect to my-listing
+  // Listing agents use their dedicated workspace as the role home.
   useEffect(() => {
     if (!loading && user && role === "listing_agent") {
       router.replace(ROLE_HOME[role]);
