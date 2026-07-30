@@ -157,6 +157,7 @@ interface ListingDetail {
   };
   readiness?: ListingReadiness;
   reviewSubmittedAt?: string | null;
+  content_version?: number | null;
   raw: any;
   archived: boolean;
 }
@@ -330,6 +331,7 @@ const mapListing = (item: any): ListingDetail => {
     businessRegNum: item.business_reg_num,
     claimStatus: item.claim_status,
     statusReason: item.status_reason,
+    content_version: item.content_version ?? null,
     stats: {
       views: item.views_count ?? 0,
       uniqueVisitors: item.unique_visitors_count ?? 0,
@@ -489,7 +491,12 @@ export default function ListingDetailsPage() {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ status: newStatus, status_reason: reason || null, admin_past_event_override: pastEventOverride }),
+        body: JSON.stringify({
+          status: newStatus,
+          status_reason: reason || null,
+          admin_past_event_override: pastEventOverride,
+          expected_content_version: listing.content_version,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
