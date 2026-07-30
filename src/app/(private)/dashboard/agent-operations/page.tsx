@@ -1,5 +1,5 @@
-import AdminAgentOperations from "@/components/dashboard/admin-agent-operations";
+import { redirect } from "next/navigation";
 
 export default function AdminAgentOperationsPage() {
-  return <AdminAgentOperations />;
+  redirect("/dashboard/agent-operations/stewardship");
 }
