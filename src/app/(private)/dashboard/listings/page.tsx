@@ -2,6 +2,12 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsInteger,
+  parseAsStringEnum,
+} from "nuqs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +59,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/context/auth-context";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { RichTextDisplay } from "@/components/ui/rich-text-editor";
 import { ListingReadiness } from "@/lib/listing-form-v2";
 
@@ -113,6 +120,8 @@ interface RawListing {
   status?: string;
   image?: string;
   thumbnail?: string;
+  primary_image?: string;
+  cover_image?: string;
   plan?: string;
   description?: string;
   bio?: string;
@@ -139,11 +148,19 @@ interface RawListing {
     original: string;
     thumb: string;
     webp: string;
+    card?: string;
     file_size?: number;
     mime_type?: string;
     created_at: string;
     updated_at: string;
   }>;
+  cover?: {
+    id: number;
+    original: string;
+    thumb: string;
+    webp: string;
+    card?: string;
+  } | null;
   city?: string;
   country?: string;
   submission_readiness?: ListingReadiness;
@@ -177,13 +194,40 @@ export default function Listings() {
   const router = useRouter();
   const { user: authUser, loading: authLoading } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<TabType>("all");
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsStringEnum<TabType>([
+      "all",
+      "approved",
+      "pending",
+      "draft",
+      "suspended",
+      "rejected",
+      "archived",
+    ]).withDefault("all"),
+  );
   const [allData, setAllData] = useState<Listing[]>([]);
   const [displayData, setDisplayData] = useState<Listing[]>([]);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useQueryState(
+    "status",
+    parseAsString.withDefault("all"),
+  );
+  const [typeFilter, setTypeFilter] = useQueryState(
+    "type",
+    parseAsString.withDefault("all"),
+  );
+  const [search, setSearch] = useQueryState(
+    "search",
+    parseAsString.withDefault(""),
+  );
+  // The input stays bound to `search` (instant feedback); only the fetch waits
+  // for typing to settle, so a search term costs one request instead of one
+  // per keystroke (which was tripping the API's 20/min rate limit).
+  const debouncedSearch = useDebouncedValue(search);
+  const [currentPage, setCurrentPage] = useQueryState(
+    "page",
+    parseAsInteger.withDefault(1),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [, setError] = useState<string | null>(null);
@@ -245,8 +289,19 @@ export default function Listings() {
         vendorName = item.vendor || item.business_name || "Unknown Vendor";
       }
 
+      // The explicit cover always wins over whichever image happens to be
+      // first in `images` — keeps this table in sync with what every other
+      // page shows for the same listing.
       let imageUrl = "/images/no-image.jpg";
-      if (item.images && item.images.length > 0) {
+      const explicitCover =
+        item.cover?.card ||
+        item.cover?.webp ||
+        item.cover?.original ||
+        item.primary_image ||
+        item.cover_image;
+      if (explicitCover) {
+        imageUrl = getImageUrl(explicitCover);
+      } else if (item.images && item.images.length > 0) {
         const validImage = item.images.find((img) => !!img.original);
         if (validImage) {
           imageUrl = getImageUrl(validImage.original);
@@ -353,7 +408,7 @@ export default function Listings() {
         per_page: itemsPerPage.toString(),
       });
 
-      if (search) params.append("search", search);
+      if (debouncedSearch) params.append("search", debouncedSearch);
       if (typeFilter !== "all") params.append("type", typeFilter);
       if (activeTab === "all" && statusFilter !== "all") params.append("status", statusFilter);
 
@@ -424,7 +479,7 @@ export default function Listings() {
     authLoading,
     activeTab,
     currentPage,
-    search,
+    debouncedSearch,
     statusFilter,
     typeFilter,
   ]);

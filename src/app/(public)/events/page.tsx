@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import NavigationTab from "@/components/navigation-tab";
+import NavigationTab from "@/components/ux/navigation-tab";
 import EventsContent from "./events-content";
 
 export default async function EventsPage() {

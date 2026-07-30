@@ -29,7 +29,26 @@ interface ProductionAnalyticsProps {
   allowedHosts: string[];
   clarityProjectId: string | null;
   gaMeasurementId: string;
-  routeScope: "public" | "private";
+}
+
+// Routes that sit behind auth or otherwise aren't the public-facing
+// directory — Clarity (session replay) is intentionally excluded from
+// these, mirroring the old per-route-group `includeClarity` prop. Kept
+// here (rather than passed down from a layout) because there's now a
+// single root layout shared by every route.
+const PRIVATE_PATH_PREFIXES = [
+  "/auth",
+  "/become-a-vendor",
+  "/claim",
+  "/dashboard",
+];
+
+function resolveRouteScope(pathname: string | null): "public" | "private" {
+  if (!pathname) return "public";
+  const isPrivate = PRIVATE_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+  return isPrivate ? "private" : "public";
 }
 
 function appendExternalScript(id: string, source: string): void {
@@ -97,10 +116,12 @@ export function ProductionAnalytics({
   allowedHosts,
   clarityProjectId,
   gaMeasurementId,
-  routeScope,
 }: ProductionAnalyticsProps) {
   const pathname = usePathname();
   const lastPageLocation = useRef<string | null>(null);
+  const routeScope = resolveRouteScope(pathname);
+  const effectiveClarityProjectId =
+    routeScope === "private" ? null : clarityProjectId;
 
   const hostnameAllowed =
     typeof window !== "undefined" &&
@@ -125,14 +146,14 @@ export function ProductionAnalytics({
       )}`,
     );
 
-    if (clarityProjectId) {
+    if (effectiveClarityProjectId) {
       const clarity = ensureClarityQueue();
       clarityConsent(initialConsent);
       clarity("set", "environment", "production");
       clarity("set", "route_scope", routeScope);
       appendExternalScript(
         "mefie-microsoft-clarity",
-        `https://www.clarity.ms/tag/${encodeURIComponent(clarityProjectId)}`,
+        `https://www.clarity.ms/tag/${encodeURIComponent(effectiveClarityProjectId)}`,
       );
     }
 
@@ -140,7 +161,7 @@ export function ProductionAnalytics({
       const consent = (event as CustomEvent<AnalyticsConsent>).detail;
       googleConsent("update", consent);
 
-      if (clarityProjectId) clarityConsent(consent);
+      if (effectiveClarityProjectId) clarityConsent(consent);
     };
 
     window.addEventListener(CONSENT_CHANGE_EVENT, handleConsentChange);
@@ -148,12 +169,7 @@ export function ProductionAnalytics({
     return () => {
       window.removeEventListener(CONSENT_CHANGE_EVENT, handleConsentChange);
     };
-  }, [
-    clarityProjectId,
-    gaMeasurementId,
-    hostnameAllowed,
-    routeScope,
-  ]);
+  }, [effectiveClarityProjectId, gaMeasurementId, hostnameAllowed, routeScope]);
 
   useEffect(() => {
     if (!hostnameAllowed || !window.gtag) return;

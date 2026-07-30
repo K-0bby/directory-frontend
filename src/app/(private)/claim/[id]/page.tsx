@@ -40,7 +40,7 @@ import {
 import { toast } from "sonner";
 
 // Components from your library
-import { HeroCarousel } from "@/components/hero-slide";
+import { HeroCarousel } from "@/components/ux/hero-slide";
 import { ClaimEligibility, getClaimEligibility } from "@/lib/api";
 
 // --- Types ---

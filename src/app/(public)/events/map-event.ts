@@ -1,6 +1,6 @@
-import { slugifyCategory } from "@/components/scrollable-category-tabs";
+import { slugifyCategory } from "@/components/ux/scrollable-category-tabs";
 import { ApiListing, pickDisplayCategory } from "@/lib/directory/types";
-import { processImages, formatDateTime } from "@/lib/directory/image-utils";
+import { processImages, formatDateTime, resolveCoverUrl } from "@/lib/directory/image-utils";
 import { format12Hour } from "@/lib/directory/event-formatting";
 import type { ProcessedEvent } from "@/types/event";
 
@@ -20,7 +20,12 @@ export function createEventMapper(filterCountry?: string | null) {
       if (itemCountry !== target) return null;
     }
 
-    const images = processImages(item.images, [item.primary_image, item.image, item.cover_image]);
+    const images = processImages(item.images, [
+      resolveCoverUrl(item.cover),
+      item.primary_image,
+      item.image,
+      item.cover_image,
+    ]);
     const category = pickDisplayCategory(item.categories ?? []);
 
     const startDate = formatDateTime(item.event_start_date);

@@ -3,7 +3,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppSidebar } from "@/components/ux/app-sidebar";
 import Header from "@/components/dashboard/header";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";

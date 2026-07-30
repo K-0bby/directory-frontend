@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { useQueryState, parseAsString } from "nuqs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -175,7 +176,10 @@ export default function FaqsPage() {
   const { loading: authLoading } = useAuth();
 
   const [faqs, setFaqs] = useState<FAQ[]>([]);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useQueryState(
+    "search",
+    parseAsString.withDefault(""),
+  );
   const [isLoading, setIsLoading] = useState(false);
 
   // Create (dynamic multi-row) dialog

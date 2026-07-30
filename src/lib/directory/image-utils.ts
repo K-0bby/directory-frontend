@@ -15,10 +15,25 @@ export function getImageUrl(url: string | undefined | null): string {
 }
 
 /**
- * Normalise a listing's images array into a non-empty list of absolute URLs.
+ * Resolve a listing's explicit cover image (the backend's `cover` object —
+ * NOT `primary_image`/`cover_image`, which don't exist in the API response)
+ * to a URL, preferring the card-cropped variant. Returns undefined when no
+ * cover has been explicitly set, so callers can fall back to `images[0]`.
+ */
+export function resolveCoverUrl(cover: ApiImage | null | undefined): string | undefined {
+  if (!cover) return undefined;
+  return cover.card || cover.webp || cover.original || undefined;
+}
+
+/**
+ * Normalise a listing's images array into a non-empty list of absolute URLs,
+ * with the backend's explicit cover (first truthy entry in `fallbacks` —
+ * typically `primary_image`) always placed first when present. Array order
+ * in `images` isn't guaranteed to put the intended cover first, and
+ * different endpoints have disagreed on it for the same listing, so the
+ * explicit cover field is authoritative rather than a last-resort fallback.
  * Prefers `img.webp` (smaller file, ~50% of JPEG original) when available,
- * falling back to `img.original`. Falls back further to the item's
- * `image` / `cover_image` field, and finally to the generic placeholder.
+ * falling back to `img.original`.
  */
 export function processImages(
   images: (ApiImage | string)[] | undefined,
@@ -35,11 +50,13 @@ export function processImages(
       getImageUrl(typeof img === "string" ? img : (img.card || img.webp || img.original)),
     );
 
-  if (valid.length > 0) return valid;
-
-  for (const fb of fallbacks) {
-    if (fb) return [getImageUrl(fb)];
+  const cover = fallbacks.find((fb) => !!fb);
+  if (cover) {
+    const coverUrl = getImageUrl(cover);
+    return [coverUrl, ...valid.filter((url) => url !== coverUrl)];
   }
+
+  if (valid.length > 0) return valid;
 
   return [FALLBACK_IMAGE];
 }

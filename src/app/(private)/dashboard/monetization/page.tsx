@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsStringEnum,
+} from "nuqs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -150,9 +155,13 @@ interface MonetizationApiResponse {
 
 export default function Monetization() {
   const { user: authUser, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<
-    "subscription" | "featuredListings"
-  >("subscription");
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsStringEnum<"subscription" | "featuredListings">([
+      "subscription",
+      "featuredListings",
+    ]).withDefault("subscription"),
+  );
 
   // --- Data State ---
   const [subscriptions, setSubscriptions] = useState<SubscriptionSummary[]>([]);
@@ -177,11 +186,26 @@ export default function Monetization() {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
 
   // --- Filter State ---
-  const [paymentSearch, setPaymentSearch] = useState("");
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState("All");
-  const [paymentPlanFilter, setPaymentPlanFilter] = useState("All");
-  const [listingSearch, setListingSearch] = useState("");
-  const [listingStatusFilter, setListingStatusFilter] = useState("All");
+  const [paymentSearch, setPaymentSearch] = useQueryState(
+    "payment_search",
+    parseAsString.withDefault(""),
+  );
+  const [paymentStatusFilter, setPaymentStatusFilter] = useQueryState(
+    "payment_status",
+    parseAsString.withDefault("All"),
+  );
+  const [paymentPlanFilter, setPaymentPlanFilter] = useQueryState(
+    "payment_plan",
+    parseAsString.withDefault("All"),
+  );
+  const [listingSearch, setListingSearch] = useQueryState(
+    "listing_search",
+    parseAsString.withDefault(""),
+  );
+  const [listingStatusFilter, setListingStatusFilter] = useQueryState(
+    "listing_status",
+    parseAsString.withDefault("All"),
+  );
 
   // --- Helper: Auth Token ---
   const getAuthToken = useCallback(() => {

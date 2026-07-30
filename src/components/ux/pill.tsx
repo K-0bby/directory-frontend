@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
-import { Badge } from "./ui/badge";
+import { Badge } from "../ui/badge";
 
 interface PillProps {
   label: string;

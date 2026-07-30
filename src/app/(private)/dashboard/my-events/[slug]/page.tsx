@@ -33,9 +33,9 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/auth-context";
 
 // Imported Components
-import { MediaGallery } from "@/components/media-gallery";
-import { HeroCarousel } from "@/components/hero-slide";
-import { ReviewsSection } from "@/components/review-button";
+import { MediaGallery } from "@/components/ux/media-gallery";
+import { HeroCarousel } from "@/components/ux/hero-slide";
+import { ReviewsSection } from "@/components/ux/review-button";
 
 // --- Type Definitions ---
 

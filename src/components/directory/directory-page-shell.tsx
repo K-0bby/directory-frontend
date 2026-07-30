@@ -1,11 +1,11 @@
 "use client";
 
 import { ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useQueryState, parseAsString } from "nuqs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import ScrollableCategoryTabs from "@/components/scrollable-category-tabs";
-import SearchHeader from "@/components/search-header";
+import ScrollableCategoryTabs from "@/components/ux/scrollable-category-tabs";
+import SearchHeader from "@/components/ux/search-header";
 import { Country } from "@/components/ui/country-dropdown";
 import { ApiListing } from "@/lib/directory/types";
 
@@ -79,23 +79,40 @@ export function DirectoryPageShell<T>({
   renderMidBanner,
   renderFooterCta,
 }: DirectoryPageShellProps<T>) {
-  const searchParams = useSearchParams();
-  const filterCountry = searchParams.get("country");
   // Store both id and slug in the URL so the backend can use whichever it supports.
-  const categoryIdParam = searchParams.get("category_id");
-  const categorySlugParam = searchParams.get("category_slug");
+  const [categoryIdParam, setCategoryIdParam] = useQueryState(
+    "category_id",
+    parseAsString,
+  );
+  const [categorySlugParam, setCategorySlugParam] = useQueryState(
+    "category_slug",
+    parseAsString,
+  );
+  const [filterCountry, setFilterCountry] = useQueryState(
+    "country",
+    parseAsString,
+  );
   // Prefer slug for tab-pill active-state matching; fall back to id string.
   const selectedCategory = categorySlugParam || categoryIdParam || "all";
   const isCategorySelected = selectedCategory !== "all";
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState<string>(
-    () => filterCountry?.toLowerCase() || "",
+  const [searchQuery, setSearchQuery] = useQueryState(
+    "q",
+    parseAsString.withDefault(""),
   );
+  const [dateFrom, setDateFrom] = useQueryState(
+    "event_start_date",
+    parseAsString.withDefault(""),
+  );
+  const [dateTo, setDateTo] = useQueryState(
+    "event_end_date",
+    parseAsString.withDefault(""),
+  );
+  // Derived directly from the URL-backed `country` param so it always stays
+  // in sync with back/forward navigation, not just explicit dropdown changes.
+  const selectedCountry = (filterCountry ?? "").toLowerCase();
   // Proper-cased country for API requests (category pills and backend geo filter).
-  const [activeCountry, setActiveCountry] = useState<string>(filterCountry ?? "");
+  const activeCountry = filterCountry ?? "";
 
   // Items fetched when a category pill (non-"all") is selected.
   // Loading is derived from whether the current fetch key matches the last completed one —
@@ -175,38 +192,28 @@ export function DirectoryPageShell<T>({
 
   const handleCategoryTabChange = useCallback(
     (slug: string, id: number | null) => {
-      const params = new URLSearchParams(searchParams.toString());
       if (slug === "all") {
-        params.delete("category_id");
-        params.delete("category_slug");
+        setCategoryIdParam(null);
+        setCategorySlugParam(null);
       } else {
         // Write both so the backend can use whichever it supports.
-        if (id !== null) params.set("category_id", String(id));
-        params.set("category_slug", slug);
+        if (id !== null) setCategoryIdParam(String(id));
+        setCategorySlugParam(slug);
       }
-      const qs = params.toString();
-      const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-      window.history.replaceState(null, "", url);
     },
-    [searchParams],
+    [setCategoryIdParam, setCategorySlugParam],
   );
 
-  const handleCountryChange = useCallback((country: Country | null) => {
-    const countryName = country?.name || "";
-    setSelectedCountry(countryName.toLowerCase());
-    setActiveCountry(countryName);
-    
-    // Update URL params so useDirectoryListings re-fetches with the new country filter
-    const params = new URLSearchParams(searchParams.toString());
-    if (countryName) {
-      params.set("country", countryName);
-    } else {
-      params.delete("country");
-    }
-    const qs = params.toString();
-    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-    window.history.replaceState(null, "", url);
-  }, [searchParams]);
+  const handleCountryChange = useCallback(
+    (country: Country | null) => {
+      const countryName = country?.name || "";
+      // Update the URL so useDirectoryListings re-fetches with the new
+      // country filter; `selectedCountry`/`activeCountry` are derived from
+      // this same param, so they update automatically.
+      setFilterCountry(countryName || null);
+    },
+    [setFilterCountry],
+  );
 
   const headerFilteredItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

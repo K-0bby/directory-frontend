@@ -5,8 +5,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import useEmblaCarousel from "embla-carousel-react";
 import { Button } from "@/components/ui/button";
 import { CarouselDots } from "@/components/ui/carousel-dots";
-import { BusinessCard } from "@/components/business-card";
-import { EventCard } from "@/components/event-card";
+import { BusinessCard } from "@/components/ux/business-card";
+import { EventCard } from "@/components/ux/event-card";
 import CommunityCard from "@/components/communities/community-card";
 import type {
   CuratedCollection,

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import useEmblaCarousel from "embla-carousel-react";
 import type { Business as ApiBusiness } from "@/lib/api"; // Renamed
-import { BusinessCard } from "../business-card";
+import { BusinessCard } from "../ux/business-card";
 import { Button } from "../ui/button";
 
 interface BusinessSectionProps {

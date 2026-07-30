@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import BusinessSection from "@/components/business/business-section";
-import { BusinessCard } from "@/components/business-card";
+import { BusinessCard } from "@/components/ux/business-card";
 import { Button } from "@/components/ui/button";
 import { DirectoryPageShell } from "@/components/directory/directory-page-shell";
 import { useDirectoryListings } from "@/lib/directory/use-directory-listings";

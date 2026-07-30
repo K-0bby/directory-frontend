@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useQueryState, parseAsInteger } from "nuqs";
 import { ChevronLeft, ChevronRight, Heart, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,10 +18,10 @@ import { useBookmark } from "@/context/bookmark-context";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { InviteFriendModal } from "@/components/dashboard/invite-friend-modal";
-import { BusinessCard } from "@/components/business-card";
-import type { Business } from "@/components/business-card";
-import { EventCard } from "@/components/event-card";
-import type { Event } from "@/components/event-card";
+import { BusinessCard } from "@/components/ux/business-card";
+import type { Business } from "@/components/ux/business-card";
+import { EventCard } from "@/components/ux/event-card";
+import type { Event } from "@/components/ux/event-card";
 import CommunityCard from "@/components/communities/community-card";
 import type { CommunityCard as CommunityCardType } from "@/lib/data";
 
@@ -202,7 +203,10 @@ export default function Bookmarks() {
   const [isJoiningVendor] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useQueryState(
+    "page",
+    parseAsInteger.withDefault(1),
+  );
   const itemsPerPage = 6;
 
   useEffect(() => {

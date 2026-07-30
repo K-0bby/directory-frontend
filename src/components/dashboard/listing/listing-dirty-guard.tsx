@@ -17,12 +17,11 @@ interface Props {
   open: boolean;
   saving: boolean;
   onStayAndSave: () => void;
-  onDiscard: () => void;
   onLeave: () => void;
   onCancel: () => void;
 }
 
-export function ListingDirtyGuard({ open, saving, onStayAndSave, onDiscard, onLeave, onCancel }: Props) {
+export function ListingDirtyGuard({ open, saving, onStayAndSave, onLeave, onCancel }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <AlertDialogContent>
@@ -32,15 +31,12 @@ export function ListingDirtyGuard({ open, saving, onStayAndSave, onDiscard, onLe
             This step contains changes that have not been saved yet.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter className="sm:justify-between">
+        <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel}>Keep editing</AlertDialogCancel>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <Button type="button" variant="outline" onClick={onDiscard} disabled={saving}>Discard</Button>
-            <Button type="button" variant="ghost" onClick={onLeave} disabled={saving}>Leave without saving</Button>
-            <AlertDialogAction onClick={(event) => { event.preventDefault(); onStayAndSave(); }} disabled={saving}>
-              {saving ? "Saving…" : "Stay and save"}
-            </AlertDialogAction>
-          </div>
+          <Button type="button" variant="ghost" onClick={onLeave} disabled={saving}>Leave without saving</Button>
+          <AlertDialogAction onClick={(event) => { event.preventDefault(); onStayAndSave(); }} disabled={saving}>
+            {saving ? "Saving…" : "Stay and save"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

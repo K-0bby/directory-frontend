@@ -2,6 +2,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import {
+  useQueryState,
+  parseAsString,
+  parseAsInteger,
+  parseAsStringEnum,
+} from "nuqs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,15 +80,36 @@ export default function Users() {
   const router = useRouter();
   const { user: authUser, loading: authLoading } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<TabType>("all");
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsStringEnum<TabType>([
+      "all",
+      "vendors",
+      "customers",
+      "admins",
+      "listing_agents",
+    ]).withDefault("all"),
+  );
   const [allData, setAllData] = useState<User[]>([]);
   const [displayData, setDisplayData] = useState<User[]>([]);
 
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [planFilter, setPlanFilter] = useState("all");
-  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useQueryState(
+    "status",
+    parseAsString.withDefault("all"),
+  );
+  const [planFilter, setPlanFilter] = useQueryState(
+    "plan",
+    parseAsString.withDefault("all"),
+  );
+  const [search, setSearch] = useQueryState(
+    "search",
+    parseAsString.withDefault(""),
+  );
 
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useQueryState(
+    "page",
+    parseAsInteger.withDefault(1),
+  );
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
@@ -358,8 +385,10 @@ export default function Users() {
   ]);
 
   useEffect(
-    () => setCurrentPage(1),
-    [statusFilter, planFilter, search, activeTab],
+    () => {
+      setCurrentPage(1);
+    },
+    [statusFilter, planFilter, search, activeTab, setCurrentPage],
   );
 
   // --- Pagination Helpers ---

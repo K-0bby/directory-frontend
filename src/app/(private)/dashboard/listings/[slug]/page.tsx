@@ -199,7 +199,13 @@ const mapListing = (item: any): ListingDetail => {
         .filter((img: any) => !!(img.original || img))
         .map((img: any) => getImageUrl(img.original || img))
     : [];
+  // The explicit cover always wins over whichever image happens to be first
+  // in `images` — keeps this page in sync with what every other page shows
+  // for the same listing.
+  const explicitCover =
+    item.cover?.card || item.cover?.webp || item.cover?.original;
   const image =
+    (explicitCover && getImageUrl(explicitCover)) ||
     images[0] ||
     getImageUrl(item.image || item.thumbnail) ||
     "/images/no-image.jpg";

@@ -6,7 +6,7 @@ import type { Business as ApiBusiness } from "@/lib/api";
 import {
   BusinessCard,
   type Business as BusinessCardBusiness,
-} from "../business-card";
+} from "../ux/business-card";
 import { Button } from "../ui/button";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 
