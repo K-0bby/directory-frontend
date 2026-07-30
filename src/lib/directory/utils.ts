@@ -167,3 +167,28 @@ export const parseLaravel422Errors = (
     ]),
   );
 };
+
+// Laravel uses dot notation for nested/array validation keys. Forms generally
+// register the parent control, so normalize `category_ids.1` to `category_ids`
+// while retaining the original key for diagnostics and summaries.
+export interface NormalizedValidationError {
+  field: string;
+  sourceField: string;
+  message: string;
+}
+
+export const normalizeLaravel422Errors = (
+  errors: Laravel422Errors,
+  aliases: Record<string, string> = {},
+): NormalizedValidationError[] =>
+  Object.entries(errors).flatMap(([sourceField, messages]) => {
+    const parentField = sourceField.split(".")[0];
+    const field = aliases[sourceField] ?? aliases[parentField] ?? parentField;
+    const normalizedMessages = Array.isArray(messages) ? messages : [String(messages)];
+
+    return normalizedMessages.map((message) => ({
+      field,
+      sourceField,
+      message,
+    }));
+  });

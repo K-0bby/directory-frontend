@@ -200,8 +200,8 @@ export default function AgentListingWorkspace({
             <section className="rounded-xl border bg-white p-5 shadow-sm">
               <h2 className="text-lg font-semibold">Private sources</h2>
               <p className="mt-1 text-sm text-slate-500">
-                One primary source and no more than five total. URLs are private and
-                safety-checked by the backend.
+                Optionally record up to five sources for administrator reference.
+                URLs remain private and a primary source is not required.
               </p>
 
               <form className="mt-5 space-y-3" onSubmit={submitSource}>

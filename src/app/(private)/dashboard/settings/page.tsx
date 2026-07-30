@@ -29,6 +29,11 @@ import { normalizeRole } from "@/lib/roles";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { InviteFriendModal } from "@/components/dashboard/invite-friend-modal";
+import {
+  changePassword,
+  ProfileSettingsApiError,
+  updateUserProfile,
+} from "@/lib/api";
 
 // Phone Input Imports
 import { PhoneInput } from "react-international-phone";
@@ -363,7 +368,7 @@ export default function Settings() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("");
+  const [countryCode, setCountryCode] = useState("GB");
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -404,8 +409,8 @@ export default function Settings() {
       setFirstName(user.first_name || "");
       setLastName(user.last_name || "");
       setEmail(user.email || "");
-      setRole(user.role || "");
       setPhoneNumber(user.phone || "");
+      setCountryCode(user.country_code || "GB");
     }
   }, [user]);
 
@@ -422,38 +427,22 @@ export default function Settings() {
   const handleUpdateProfile = async () => {
     setIsUpdatingProfile(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://me-fie.co.uk";
       const token = localStorage.getItem("authToken");
-
-      const headers = {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      };
 
       const body = new FormData();
       body.append("first_name", firstName);
       body.append("last_name", lastName);
-      body.append("role", role || "user");
-      body.append("phone", phoneNumber); // Sends full phone number with code
-
-      // Laravel trick
+      body.append("email", email);
+      body.append("phone", phoneNumber);
+      body.append("country_code", countryCode);
       body.append("_method", "PATCH");
 
       if (fileInputRef.current?.files?.[0]) {
         body.append("avatar", fileInputRef.current.files[0]);
       }
 
-      const response = await fetch(`${API_URL}/api/update_user`, {
-        method: "POST",
-        headers,
-        body,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update profile");
-      }
-
-      refetchUser();
+      await updateUserProfile(body, token ?? undefined);
+      await refetchUser();
 
       setSuccessMessage({
         title: "Profile Updated",
@@ -462,7 +451,11 @@ export default function Settings() {
       setSuccessDialogOpen(true);
     } catch (error) {
       console.error(error);
-      toast("Error updating profile");
+      const message =
+        error instanceof ProfileSettingsApiError
+          ? Object.values(error.errors).flat()[0] || error.message
+          : "Error updating profile";
+      toast(message);
     } finally {
       setIsUpdatingProfile(false);
     }
@@ -480,30 +473,14 @@ export default function Settings() {
 
     setIsChangingPassword(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://me-fie.co.uk";
       const token = localStorage.getItem("authToken");
-
-      const headers = {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      };
-
-      const body = {
-        current_password: passwordData.currentPassword,
-        new_password: passwordData.newPassword,
-      };
-
-      const response = await fetch(`${API_URL}/api/change_password`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to change password");
-      }
+      await changePassword(
+        {
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        },
+        token ?? undefined,
+      );
 
       setSuccessMessage({
         title: "Password Changed",
@@ -516,9 +493,13 @@ export default function Settings() {
         newPassword: "",
         confirmPassword: "",
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      toast(error.message || "Error changing password");
+      const message =
+        error instanceof ProfileSettingsApiError
+          ? Object.values(error.errors).flat()[0] || error.message
+          : "Error changing password";
+      toast(message);
     } finally {
       setIsChangingPassword(false);
     }
@@ -616,6 +597,7 @@ export default function Settings() {
     passwordData.currentPassword.length > 0 &&
     passwordData.newPassword.length > 0 &&
     passwordData.confirmPassword.length > 0;
+  const isListingAgent = normalizeRole(user?.role ?? "") === "listing_agent";
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-2 lg:p-8">
@@ -684,6 +666,17 @@ export default function Settings() {
                     </div>
 
                     <div>
+                      <Label>Profile photo</Label>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-left text-sm text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-lime-500"
+                      >
+                        Choose an image
+                      </button>
+                    </div>
+
+                    <div>
                       <Label>First Name</Label>
                       <Input
                         placeholder="Jenny"
@@ -714,9 +707,12 @@ export default function Settings() {
                     <div>
                       <Label>Phone Number</Label>
                       <PhoneInput
-                        defaultCountry="gb"
+                        defaultCountry={countryCode.toLowerCase()}
                         value={phoneNumber}
-                        onChange={(phone) => setPhoneNumber(phone)}
+                        onChange={(phone, meta) => {
+                          setPhoneNumber(phone);
+                          setCountryCode(meta.country.iso2.toUpperCase());
+                        }}
                         inputClassName="w-full h-11 border border-gray-300 rounded-r-3xl px-4 focus:outline-none focus:ring-2 focus:ring-lime-500 font-sans text-sm text-gray-900"
                         className="w-full"
                         countrySelectorStyleProps={{
@@ -803,7 +799,8 @@ export default function Settings() {
             </div>
 
             <div className="space-y-5 mt-4 py-4">
-              {normalizeRole(user?.role ?? "") !== "customer" && (
+              {!isListingAgent &&
+                normalizeRole(user?.role ?? "") !== "customer" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* <div className="bg-[#C9D9E8] rounded-xl p-8 flex flex-col justify-between min-h-[200px]">
                     <div className="space-y-2 max-w-sm">
@@ -855,7 +852,7 @@ export default function Settings() {
               )}
             </div>
 
-            <Card className="rounded-2xl mt-6">
+            {!isListingAgent && <Card className="rounded-2xl mt-6">
               <div className="p-6 flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
@@ -923,7 +920,7 @@ export default function Settings() {
                   </DialogContent>
                 </Dialog>
               </div>
-            </Card>
+            </Card>}
           </>
         )}
 

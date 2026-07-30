@@ -56,7 +56,28 @@ export interface User {
   name: string;
   email: string;
   role?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  country_code?: string;
+  image?: string | null;
   createdAt?: string;
+}
+
+export class ProfileSettingsApiError extends Error {
+  constructor(
+    message: string,
+    readonly errors: Record<string, string[]> = {},
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "ProfileSettingsApiError";
+  }
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface Category {
@@ -269,6 +290,63 @@ export async function updateUser(data: Partial<User>, token?: string): Promise<U
   }
 
   return response.json();
+}
+
+export async function updateUserProfile(
+  data: FormData,
+  token?: string,
+): Promise<User> {
+  const response = await fetch("/api/update_user", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: data,
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    message?: string;
+    errors?: Record<string, string[]>;
+    data?: User;
+  };
+  if (!response.ok) {
+    throw new ProfileSettingsApiError(
+      payload.message || "Failed to update profile",
+      payload.errors,
+      response.status,
+    );
+  }
+  if (!payload.data) {
+    throw new ProfileSettingsApiError("Profile response was incomplete");
+  }
+  return payload.data;
+}
+
+export async function changePassword(
+  input: ChangePasswordInput,
+  token?: string,
+): Promise<void> {
+  const response = await fetch("/api/change_password", {
+    method: "PUT",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({
+      current_password: input.currentPassword,
+      new_password: input.newPassword,
+    }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    message?: string;
+    error?: string;
+    errors?: Record<string, string[]>;
+  };
+  if (!response.ok) {
+    throw new ProfileSettingsApiError(
+      payload.message || payload.error || "Failed to change password",
+      payload.errors,
+      response.status,
+    );
+  }
 }
 
 // ============================================================================
@@ -1574,7 +1652,6 @@ export interface AgentWorkListing {
     | "superseded"
     | null;
   claim_state: AgentClaimState;
-  source_completeness: boolean;
   source_count: number;
   last_updated_at: string;
   available_next_action:
@@ -1598,7 +1675,6 @@ export interface AgentMetrics {
   currently_unclaimed: number;
   claimed: number;
   median_moderation_turnaround_seconds: number | null;
-  source_completeness: number | null;
   duplicate_warning_rate: number | null;
   historical_coverage_notice: string;
 }
@@ -1617,6 +1693,13 @@ export interface AgentWorkResponse {
     per_page?: number;
     total?: number;
   };
+}
+
+export interface AgentWorkQuery {
+  state?: AgentListingState | AgentClaimState;
+  q?: string;
+  page?: number;
+  perPage?: number;
 }
 
 export interface GrandfatheredOwnedListing {
@@ -1806,11 +1889,14 @@ async function lifecycleApiError(
 
 export async function getAgentWork(
   token?: string,
-  state?: AgentListingState | AgentClaimState,
-  page = 1,
+  query: AgentWorkQuery = {},
 ): Promise<AgentWorkResponse> {
-  const params = new URLSearchParams({ page: String(page) });
-  if (state) params.set("state", state);
+  const params = new URLSearchParams({
+    page: String(query.page ?? 1),
+    per_page: String(query.perPage ?? 20),
+  });
+  if (query.state) params.set("state", query.state);
+  if (query.q?.trim()) params.set("q", query.q.trim());
   const response = await fetch(`/api/agent/listings?${params}`, {
     headers: agentAuthHeaders(token),
     cache: "no-store",

@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   CircleAlert,
   Clock3,
-  FilePlus2,
   Handshake,
   RefreshCw,
 } from "lucide-react";
@@ -15,7 +14,6 @@ import { toast } from "sonner";
 
 import {
   AgentClaimState,
-  AgentListingState,
   AgentMetrics,
   AgentWorkListing,
   getAgentMetrics,
@@ -24,18 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RoleGuard } from "@/components/dashboard/role-guard";
-
-type WorkFilter = "all" | AgentListingState | AgentClaimState;
-
-const FILTERS: Array<{ value: WorkFilter; label: string }> = [
-  { value: "all", label: "All work" },
-  { value: "draft", label: "Drafts" },
-  { value: "pending", label: "Pending" },
-  { value: "changes_requested", label: "Needs changes" },
-  { value: "approved", label: "Approved" },
-  { value: "claim_in_progress", label: "Claim in progress" },
-  { value: "claimed", label: "Handed over" },
-];
+import { AgentCreateListingDialog } from "@/components/dashboard/listing/agent-create-listing-dialog";
 
 function formatPercent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value * 100)}%`;
@@ -65,7 +52,6 @@ function claimBadgeClass(state: AgentClaimState): string {
 export default function AgentHome() {
   const [metrics, setMetrics] = useState<AgentMetrics | null>(null);
   const [listings, setListings] = useState<AgentWorkListing[]>([]);
-  const [filter, setFilter] = useState<WorkFilter>("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +62,7 @@ export default function AgentHome() {
     try {
       const [metricData, workData] = await Promise.all([
         getAgentMetrics(token),
-        getAgentWork(token, filter === "all" ? undefined : filter),
+        getAgentWork(token, { perPage: 5 }),
       ]);
       setMetrics(metricData);
       setListings(workData.data);
@@ -90,7 +76,7 @@ export default function AgentHome() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -110,12 +96,7 @@ export default function AgentHome() {
               handoff immediately makes a listing read-only here.
             </p>
           </div>
-          <Button asChild className="bg-[#93C01F] text-slate-950 hover:bg-[#84ae1b]">
-            <Link href="/dashboard/my-listing/create">
-              <FilePlus2 className="mr-2 h-4 w-4" />
-              Create listing
-            </Link>
-          </Button>
+          <AgentCreateListingDialog />
           <Button asChild variant="outline">
             <Link href="/dashboard/agent/owned">Owned listings</Link>
           </Button>
@@ -138,17 +119,11 @@ export default function AgentHome() {
           ))}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border bg-white p-4">
             <p className="text-sm text-slate-500">Median moderation turnaround</p>
             <p className="mt-1 text-lg font-semibold">
               {formatDuration(metrics?.median_moderation_turnaround_seconds ?? null)}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-white p-4">
-            <p className="text-sm text-slate-500">Source completeness</p>
-            <p className="mt-1 text-lg font-semibold">
-              {formatPercent(metrics?.source_completeness ?? null)}
             </p>
           </div>
           <div className="rounded-xl border bg-white p-4">
@@ -162,23 +137,15 @@ export default function AgentHome() {
         <section className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">Listing work</h2>
+              <h2 className="text-lg font-semibold">Recent listing work</h2>
               <p className="text-sm text-slate-500">
-                Claim activity is deliberately coarse and never reveals claimant data.
+                Your five most recently updated listings.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {FILTERS.map((item) => (
-                <Button
-                  key={item.value}
-                  type="button"
-                  size="sm"
-                  variant={filter === item.value ? "default" : "outline"}
-                  onClick={() => setFilter(item.value)}
-                >
-                  {item.label}
-                </Button>
-              ))}
+              <Button asChild variant="outline">
+                <Link href="/dashboard/agent/listings">View all listings</Link>
+              </Button>
               <Button type="button" size="icon" variant="ghost" onClick={() => void load()}>
                 <RefreshCw className="h-4 w-4" />
                 <span className="sr-only">Refresh</span>
@@ -198,7 +165,7 @@ export default function AgentHome() {
             </div>
           ) : listings.length === 0 ? (
             <div className="min-h-48 p-8 text-center text-sm text-slate-500">
-              No listings match this view.
+              No listing work yet.
             </div>
           ) : (
             <div className="divide-y">
@@ -262,6 +229,7 @@ export default function AgentHome() {
         {metrics?.historical_coverage_notice && (
           <p className="text-xs text-slate-500">{metrics.historical_coverage_notice}</p>
         )}
+
       </div>
     </RoleGuard>
   );

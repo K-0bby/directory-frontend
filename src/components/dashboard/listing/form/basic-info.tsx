@@ -15,8 +15,8 @@ import { ListingFormHandle } from "@/components/dashboard/listing/types";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   isValidUrl,
+  normalizeLaravel422Errors,
   normalizeUrl,
-  parseLaravel422Errors,
 } from "@/lib/directory/utils";
 import { cleanPhone, normalizePhoneInput, validatePhone } from "@/lib/phone";
 import { handleSessionExpired } from "@/lib/session";
@@ -26,6 +26,7 @@ import {
   DuplicateAssessment,
   runDuplicateListingPreflight,
 } from "@/lib/api";
+import { FormErrorSummary } from "@/components/ui/form-error-summary";
 
 // Phone Input Imports
 import { PhoneInput } from "react-international-phone";
@@ -137,6 +138,7 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
     const [duplicateAssessment, setDuplicateAssessment] =
       useState<DuplicateAssessment | null>(null);
     const [duplicateExplanation, setDuplicateExplanation] = useState("");
+    const [submitErrors, setSubmitErrors] = useState<string[]>([]);
 
     // --- Form ---
     const form = useForm<BusinessFormValues>({
@@ -315,6 +317,7 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
     // --- 3. Submit Handler ---
     useImperativeHandle(ref, () => ({
       async submit() {
+        setSubmitErrors([]);
         const isValid = await trigger();
         if (!isValid) {
           toast.error("Please correct the errors in the form.");
@@ -354,7 +357,6 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
         // `sometimes` rule doesn't fire and reject null/empty-string values.
         const submissionData: Record<string, unknown> = {
           name: rawData.name,
-          type: listingType,
           bio: rawData.description,
           description: rawData.description,
           category_ids: rawData.category_ids
@@ -421,6 +423,11 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
             }
           }
 
+          // Listing type is immutable after creation. Sending it during an
+          // update can produce a hidden-field 422 if stale route/form state
+          // disagrees with the canonical listing.
+          if (!listingSlug) submissionData.type = listingType;
+
           const endpoint = listingSlug
             ? `/api/listing/${listingSlug}/update`
             : `/api/listing/profile`;
@@ -442,13 +449,28 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
           if (!res.ok) {
             if (handleSessionExpired(res.status)) return false;
             if (res.status === 422 && json.errors) {
-              const fieldErrors = parseLaravel422Errors(json.errors);
-              Object.entries(fieldErrors).forEach(([field, message]) => {
-                form.setError(field as keyof BusinessFormValues, { message });
+              const normalized = normalizeLaravel422Errors(json.errors, {
+                phone: "primary_phone",
+                primary_country_code: "primary_phone",
+                secondary_country_code: "secondary_phone",
               });
-              toast.error("Please correct the highlighted fields.");
+              normalized.forEach(({ field, message }) => {
+                if (field in rawData) {
+                  form.setError(field as keyof BusinessFormValues, { message });
+                }
+              });
+              const messages = normalized.map(({ message }) => message);
+              setSubmitErrors(messages);
+              toast.error(messages[0] || json.message || json.error || "Please check the form.", {
+                description:
+                  messages.length > 1
+                    ? `${messages.length - 1} more issue${messages.length === 2 ? "" : "s"} shown in the form.`
+                    : undefined,
+              });
             } else {
-              toast.error(json.error || json.message || "Submission failed");
+              const message = json.message || json.error || "Submission failed";
+              setSubmitErrors([message]);
+              toast.error(message);
             }
             return false;
           }
@@ -520,6 +542,8 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
                 : "Tell us about your community. Your community page will not appear in search results until the information provided has been verified and approved by our moderators. Once it is approved, you'll receive instructions on how to go live."}
           </p>
         </div>
+
+        <FormErrorSummary errors={submitErrors} />
 
         {!listingSlug && duplicateAssessment?.requires_explanation && (
           <div
