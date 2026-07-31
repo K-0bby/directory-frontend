@@ -103,6 +103,7 @@ function ListingCard({ item }: { item: ApiListing }) {
             ? formatDateTime(item.event_end_date)
             : "",
           verified,
+          ticketUrl: item.event_ticket_url ?? undefined,
         }}
       />
     );

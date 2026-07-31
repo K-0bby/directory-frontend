@@ -69,6 +69,7 @@ interface ApiRawItem {
     event_country?: string;
     event_location?: string;
     event_venue?: string;
+    event_ticket_url?: string;
   };
 }
 
@@ -152,6 +153,7 @@ const mapToCard = (item: ApiRawItem): MappedItem => {
       startDate: item.event?.event_start_date || item.start_date || "",
       endDate: item.event?.event_end_date || item.end_date || "",
       verified,
+      ticketUrl: item.event?.event_ticket_url,
     };
     return { type: "event" as const, slug, data };
   }

@@ -135,6 +135,7 @@ export default function EventsContent() {
             verified: e.verified,
             time: e.time,
             timezoneLabel: e.timezoneLabel,
+            ticketUrl: e.ticketUrl,
           }}
         />
       )}
