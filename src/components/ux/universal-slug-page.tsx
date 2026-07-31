@@ -1529,8 +1529,8 @@ export default function UniversalSlugPage({
 
           const rawImages = listingData.images || [];
           const gallery: GalleryItem[] = rawImages.map((img) => {
-            if (typeof img === "object" && img.original) {
-              const src = getImageUrl(img.original);
+            if (typeof img === "object" && (img.card || img.webp || img.original)) {
+              const src = getImageUrl(img.card || img.webp || img.original);
               return {
                 type: isVideoFile(src) ? "video" : "image",
                 src: src,
@@ -1554,7 +1554,10 @@ export default function UniversalSlugPage({
 
           // The explicit cover always wins over whichever image happens to be
           // first in `images` — keeps this page in sync with what listing
-          // cards elsewhere show for the same listing.
+          // cards elsewhere show for the same listing. Built with the same
+          // card/webp/original precedence as the gallery entries above, so
+          // the string match below reliably finds the cover in `gallery`
+          // instead of appending it as a duplicate.
           const explicitCover =
             listingData.cover?.card ||
             listingData.cover?.webp ||

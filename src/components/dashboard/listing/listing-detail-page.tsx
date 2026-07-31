@@ -81,6 +81,7 @@ interface ListingImage {
   original: string;
   thumb: string;
   webp: string;
+  card?: string;
   mime_type?: string;
 }
 
@@ -202,6 +203,10 @@ interface ApiListing {
   email?: string;
   website?: string;
   images: ListingImage[];
+  /** Explicit cover image, when the vendor has set one — authoritative over `images[0]`. */
+  cover?: ListingImage | null;
+  primary_image?: string;
+  cover_image?: string;
   categories: Category[];
   opening_hours?: ApiOpeningHour[];
   socials?: ApiSocials[] | ApiSocials;
@@ -454,8 +459,24 @@ export default function ListingDetailPage({ params }: PageProps) {
 
       const rawImages = data.images || [];
       const validImages = rawImages
-        .filter((img) => !!img.original)
-        .map((img) => getImageUrl(img.original));
+        .filter((img) => !!(img.card || img.webp || img.original))
+        .map((img) => getImageUrl(img.card || img.webp || img.original));
+
+      // The explicit cover always wins over whichever image happens to be
+      // first in `images` — keeps this page in sync with what every other
+      // page shows for the same listing. Built with the same
+      // card/webp/original precedence as validImages above, so the string
+      // filter below reliably de-dupes the cover instead of listing it twice.
+      const explicitCover =
+        data.cover?.card ||
+        data.cover?.webp ||
+        data.cover?.original ||
+        data.primary_image ||
+        data.cover_image;
+      const coverUrl = explicitCover ? getImageUrl(explicitCover) : undefined;
+      const orderedValidImages = coverUrl
+        ? [coverUrl, ...validImages.filter((url) => url !== coverUrl)]
+        : validImages;
 
       const backendStatus = (data.status || "").toLowerCase();
       let status: "published" | "pending" | "drafted" = "drafted";
@@ -573,8 +594,8 @@ export default function ListingDetailPage({ params }: PageProps) {
         openingHours,
         socials,
         event,
-        coverImage: validImages[0] || "/images/no-image.jpg",
-        allImages: validImages,
+        coverImage: orderedValidImages[0] || "/images/no-image.jpg",
+        allImages: orderedValidImages,
         views: data.views_count || 0,
         bookmarks: data.bookmarks_count || 0,
         rating: Number(data.rating) || 0,
