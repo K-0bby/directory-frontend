@@ -13,6 +13,15 @@ import type {
   CuratedCollectionListing,
 } from "@/types/curated-collections";
 import { parseLocalDate } from "@/lib/directory/event-formatting";
+import { processImages } from "@/lib/directory/image-utils";
+
+// Curated-collection listings don't currently carry an explicit `cover`
+// field (backend gap, tracked separately) — processImages still normalises
+// the array the same way every other listing card does, so this stays
+// correct automatically once that field is added.
+function coverAwareImages(listing: CuratedCollectionListing): string[] {
+  return processImages(listing.images, []);
+}
 
 function toBusinessCard(listing: CuratedCollectionListing) {
   return {
@@ -20,9 +29,7 @@ function toBusinessCard(listing: CuratedCollectionListing) {
     name: listing.name,
     slug: listing.slug,
     category: listing.categories[0]?.name || "",
-    images: listing.images
-      .map((img) => img.card || img.webp || img.original || img.thumb)
-      .filter(Boolean),
+    images: coverAwareImages(listing),
     rating: listing.rating ?? 0,
     reviewCount: listing.ratings_count ?? 0,
     location: listing.city || listing.country || "",
@@ -48,12 +55,7 @@ function toEventCard(listing: CuratedCollectionListing) {
     name: listing.name,
     slug: listing.slug,
     category: listing.categories[0]?.name || "",
-    image:
-      listing.images[0]?.card ||
-      listing.images[0]?.webp ||
-      listing.images[0]?.original ||
-      listing.images[0]?.thumb ||
-      "/images/no-image.jpg",
+    image: coverAwareImages(listing)[0],
     location: listing.event_venue || listing.event_city || listing.city || "",
     description: "",
     startDate: formattedDate,
@@ -68,18 +70,8 @@ function toCommunityCard(listing: CuratedCollectionListing) {
     name: listing.name,
     slug: listing.slug,
     description: listing.bio || listing.description || "",
-    imageUrl:
-      listing.images[0]?.card ||
-      listing.images[0]?.webp ||
-      listing.images[0]?.original ||
-      listing.images[0]?.thumb ||
-      "/images/no-image.jpg",
-    image:
-      listing.images[0]?.card ||
-      listing.images[0]?.webp ||
-      listing.images[0]?.original ||
-      listing.images[0]?.thumb ||
-      "/images/no-image.jpg",
+    imageUrl: coverAwareImages(listing)[0],
+    image: coverAwareImages(listing)[0],
     tag: listing.categories[0]?.name || "Community",
     verified: listing.listing_verified,
     type: "community" as const,

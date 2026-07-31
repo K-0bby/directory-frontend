@@ -9,6 +9,7 @@ import {
 } from "../ux/business-card";
 import { Button } from "../ui/button";
 import { CarouselDots } from "@/components/ui/carousel-dots";
+import { processImages, resolveCoverUrl } from "@/lib/directory/image-utils";
 
 interface BusinessBestCarouselProps {
   businesses: ApiBusiness[];
@@ -65,25 +66,15 @@ export default function BusinessBestCarousel({
 
     let images: string[] = [];
 
-    // Handle Images Logic
-    if (raw.images && Array.isArray(raw.images)) {
-      // Check if it's an array of strings
-      if (raw.images.every((img: unknown) => typeof img === "string")) {
-        images = raw.images as string[];
-      }
-      // Check if it's an array of objects with media property
-      // FIX: Typed 'img' to { media: string } to allow access without 'any' error
-      else if (
-        raw.images.every(
-          (img: { original?: string; card?: string; webp?: string }) =>
-            img && typeof img === "object" && "original" in img
-        )
-      ) {
-        images = raw.images.map(
-          (img: { original?: string; card?: string; webp?: string }) =>
-            img.card || img.webp || img.original || "",
-        );
-      }
+    // Handle Images Logic — the explicit cover always wins over whichever
+    // image happens to be first in `images`, keeping this carousel in sync
+    // with what every other page shows for the same listing.
+    if (raw.images && Array.isArray(raw.images) && raw.images.length > 0) {
+      images = processImages(raw.images, [
+        resolveCoverUrl(raw.cover),
+        raw.primary_image,
+        raw.cover_image,
+      ]);
     } else if (business.image && typeof business.image === "string") {
       images = [business.image];
     }
