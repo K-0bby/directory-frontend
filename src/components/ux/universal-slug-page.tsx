@@ -25,7 +25,7 @@ import {
 } from "@phosphor-icons/react";
 
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+// import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -978,11 +978,11 @@ function SidebarInfo({
   // other reason), the destination page has its own eligibility gate and
   // explains why if it genuinely can't be challenged.
   const showClaimSection = !previewMode && (showClaimButton || isClaimed);
-  const claimButtonLabel = hasResumableClaim
-    ? "Continue claim verification"
-    : isClaimed
-      ? "Request Ownership Review"
-      : "Claim business";
+  // const claimButtonLabel = hasResumableClaim
+  //   ? "Continue claim verification"
+  //   : isClaimed
+  //     ? "Request Ownership Review"
+  //     : "Claim business";
 
   const handleClaimBusiness = () => {
     if (user) {
@@ -1152,7 +1152,7 @@ function SidebarInfo({
           </>
         )}
 
-        {showClaimSection && (
+       {/* {showClaimSection && (
           <div className="mt-4">
             <Button
               onClick={handleClaimBusiness}
@@ -1161,7 +1161,7 @@ function SidebarInfo({
               {claimButtonLabel}
             </Button>
           </div>
-        )}
+        )} */}
 
         {/* Always shown, independent of eligibility — this is a quiet, permanent
             "is this listing wrong / not yours?" affordance (same as Google/Yelp
