@@ -32,12 +32,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { useRolePath } from "@/hooks/useRolePath";
 import { toast } from "sonner";
+import { processImages, resolveCoverUrl } from "@/lib/directory/image-utils";
 
 interface ListingImage {
   id: number;
   original: string;
   thumb: string;
   webp: string;
+  card?: string;
   mime_type?: string;
 }
 
@@ -58,6 +60,10 @@ interface ApiListing {
   creator_status?: string;
   type?: string;
   images: ListingImage[];
+  /** Explicit cover image, when the vendor has set one — authoritative over `images[0]`. */
+  cover?: ListingImage | null;
+  primary_image?: string;
+  cover_image?: string;
   categories: Category[];
   rating: number;
   ratings_count: number;
@@ -124,16 +130,6 @@ export default function VendorHome() {
   //   },
   // ];
 
-  // Helper function for image URLs
-  const getImageUrl = (url: string | undefined | null): string => {
-    if (!url) return "/images/no-image.jpg";
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      return url;
-    }
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://me-fie.co.uk";
-    return `${API_URL}/${url.replace(/^\//, "")}`;
-  };
-
   const { user, loading: authLoading } = useAuth();
   const { listingDetail } = useRolePath();
 
@@ -186,16 +182,15 @@ export default function VendorHome() {
 
       const transformedListings: ListingsTableItem[] = rawListings.map(
         (listing) => {
-          // 1. Image Logic
-          const rawImages = listing.images || [];
-          const validImages = rawImages
-            .filter((img) => !!img.original)
-            .map((img) => getImageUrl(img.original));
-
-          const coverImage =
-            validImages.length > 0
-              ? validImages[0]
-              : getImageUrl("/images/no-image.jpg");
+          // 1. Image Logic — the explicit cover always wins over whichever
+          // image happens to be first in `images`, keeping this widget in
+          // sync with what every other page shows for the same listing.
+          const validImages = processImages(listing.images, [
+            resolveCoverUrl(listing.cover),
+            listing.primary_image,
+            listing.cover_image,
+          ]);
+          const coverImage = validImages[0];
 
           const categoryText = listing.categories?.[0]?.name || "Uncategorized";
           const location =

@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-// import Navbar from "@/components/ui/navbar";
-// import Footer from "@/components/ui/footer";
-import LayoutWrapper from "@/components/layout-wrapper";
-import { AuthProvider } from "@/context/auth-context";
-import { Toaster } from "@/components/ui/sonner";
-import { BookmarkProvider } from "@/context/bookmark-context";
+import LayoutWrapper from "@/components/ux/layout-wrapper";
+import { ProductionAnalytics } from "@/components/analytics/production-analytics";
 import { CookieConsent } from "@/components/ui/cookie-consent";
-import { WhatsAppFloater } from "@/components/whatsapp-floater";
-// import MicrosoftClarity from "@/components/analytics/microsoft-clarity";
-import Script from "next/script";
+import { Toaster } from "@/components/ui/sonner";
+import { WhatsAppFloater } from "@/components/ux/whatsapp-floater";
+import { AppProviders } from "@/providers";
+import { getProductionAnalyticsConfig } from "@/lib/analytics/config";
 
 const gilroy = localFont({
   src: [
@@ -37,7 +34,6 @@ export const metadata: Metadata = {
   },
   description:
     "Mefie Directory | Discover Ghanaian Businesses, Events & Services Worldwide Discover trusted Ghanaian businesses, cultural events, communities, and services across the diaspora and beyond. Connect, promote, and grow with Mefie Directory.",
-
   keywords: [
     "Me-fie Directory",
     "African owned businesses",
@@ -133,58 +129,41 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Always resolved with Clarity included — ProductionAnalytics itself
+  // decides whether to actually load Clarity, based on which route it's
+  // currently rendering on (see resolveRouteScope there). A single shared
+  // root layout has no per-route-group prop to gate this with anymore.
+  const analytics = getProductionAnalyticsConfig(true);
+
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <Script
-          type="text/javascript"
-          id="microsoft-clarity"
-          strategy="afterInteractive"
-        >
-          {` (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-    })(window, document, "clarity", "script", "x8jgxrd7kq");`}
-        </Script>
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-L1GY8G7FVN"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-L1GY8G7FVN');
-          `}
-        </Script>
-      </head>
       <body className={`${gilroy.variable} antialiased`}>
-        {/* <Navbar /> */}
-        <AuthProvider>
-          <BookmarkProvider>
-            {/* <MicrosoftClarity /> */}
-            <LayoutWrapper>{children}</LayoutWrapper>
-            <CookieConsent />
-            <WhatsAppFloater />
-            <Toaster
-              closeButton
-              visibleToasts={3}
-              duration={4000}
-              position="top-center"
-              toastOptions={{
-                classNames: {
-                  toast: "!rounded-xl !shadow-lg !text-sm !font-medium !gap-2",
-                  title: "!font-semibold",
-                  description: "!text-xs !opacity-80",
-                  closeButton: "!rounded-lg",
-                },
-              }}
-            />
-          </BookmarkProvider>
-        </AuthProvider>
-        {/* <Footer /> */}
+        {analytics ? (
+          <ProductionAnalytics
+            allowedHosts={analytics.allowedHosts}
+            clarityProjectId={analytics.clarityProjectId}
+            gaMeasurementId={analytics.gaMeasurementId}
+          />
+        ) : null}
+        <AppProviders>
+          <LayoutWrapper>{children}</LayoutWrapper>
+          <CookieConsent />
+          <WhatsAppFloater />
+          <Toaster
+            closeButton
+            visibleToasts={3}
+            duration={4000}
+            position="top-center"
+            toastOptions={{
+              classNames: {
+                toast: "!rounded-xl !shadow-lg !text-sm !font-medium !gap-2",
+                title: "!font-semibold",
+                description: "!text-xs !opacity-80",
+                closeButton: "!rounded-lg",
+              },
+            }}
+          />
+        </AppProviders>
       </body>
     </html>
   );

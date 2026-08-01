@@ -50,6 +50,9 @@ export interface ApiListing {
   status?: string;
   claim_status?: "unclaimed" | "appealed" | "claimed" | string;
   images: (ApiImage | string)[];
+  /** Explicit cover image, when the vendor has set one — authoritative over `images[0]`. */
+  cover?: ApiImage | null;
+  cover_is_explicit?: boolean;
   cover_image?: string;
   image?: string;
   primary_image?: string;

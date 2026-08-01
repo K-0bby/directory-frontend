@@ -6,9 +6,10 @@ import type { Business as ApiBusiness } from "@/lib/api";
 import {
   BusinessCard,
   type Business as BusinessCardBusiness,
-} from "../business-card";
+} from "../ux/business-card";
 import { Button } from "../ui/button";
 import { CarouselDots } from "@/components/ui/carousel-dots";
+import { processImages, resolveCoverUrl } from "@/lib/directory/image-utils";
 
 interface BusinessCardCarouselProps {
   businesses: ApiBusiness[];
@@ -66,21 +67,15 @@ export default function BusinessCardCarousel({
 
     let images: string[] = [];
 
-    // Robust Image Handling
-    if (raw.images && Array.isArray(raw.images)) {
-      if (raw.images.every((img: unknown) => typeof img === "string")) {
-        images = raw.images as string[];
-      } else if (
-        raw.images.every(
-          (img: { original?: string; card?: string; webp?: string }) =>
-            img && typeof img === "object" && "original" in img
-        )
-      ) {
-        images = raw.images.map(
-          (img: { original?: string; card?: string; webp?: string }) =>
-            img.card || img.webp || img.original || "",
-        );
-      }
+    // Robust Image Handling — the explicit cover always wins over whichever
+    // image happens to be first in `images`, keeping this carousel in sync
+    // with what every other page shows for the same listing.
+    if (raw.images && Array.isArray(raw.images) && raw.images.length > 0) {
+      images = processImages(raw.images, [
+        resolveCoverUrl(raw.cover),
+        raw.primary_image,
+        raw.cover_image,
+      ]);
     } else if (business.image && typeof business.image === "string") {
       images = [business.image];
     }

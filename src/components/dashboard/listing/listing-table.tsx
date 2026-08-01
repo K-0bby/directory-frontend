@@ -42,7 +42,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-type ListingStatus = "published" | "pending" | "drafted" | "rejected" | "suspended" | "ended";
+type ListingStatus =
+  | "published"
+  | "pending"
+  | "drafted"
+  | "rejected"
+  | "suspended"
+  | "ended";
 
 export interface ListingsTableItem {
   id: string;
@@ -113,11 +119,23 @@ const getStatusConfig = (status: ListingStatus) => {
         ),
       };
     case "rejected":
-      return { label: "Rejected", className: "bg-red-100 text-red-700 border-red-200", icon: <CircleDashed className="w-4 h-4" /> };
+      return {
+        label: "Rejected",
+        className: "bg-red-100 text-red-700 border-red-200",
+        icon: <CircleDashed className="w-4 h-4" />,
+      };
     case "suspended":
-      return { label: "Suspended", className: "bg-orange-100 text-orange-700 border-orange-200", icon: <CircleDashed className="w-4 h-4" /> };
+      return {
+        label: "Suspended",
+        className: "bg-orange-100 text-orange-700 border-orange-200",
+        icon: <CircleDashed className="w-4 h-4" />,
+      };
     case "ended":
-      return { label: "Ended", className: "bg-slate-200 text-slate-700 border-slate-300", icon: <Clock className="w-4 h-4" /> };
+      return {
+        label: "Ended",
+        className: "bg-slate-200 text-slate-700 border-slate-300",
+        icon: <Clock className="w-4 h-4" />,
+      };
   }
 };
 

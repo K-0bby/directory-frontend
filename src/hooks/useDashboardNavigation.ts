@@ -36,7 +36,19 @@ const MENU_CONFIG: MenuItem[] = [
     title: "My Listings",
     url: "/dashboard/my-listing",
     icon: "/images/icons/listings.svg",
-    roles: ["vendor", "listing_agent"],
+    roles: ["vendor"],
+  },
+  {
+    title: "Agent Workspace",
+    url: "/dashboard/agent",
+    icon: "/images/icons/listings.svg",
+    roles: ["listing_agent"],
+  },
+  {
+    title: "My Listings",
+    url: "/dashboard/agent/listings",
+    icon: "/images/icons/listings.svg",
+    roles: ["listing_agent"],
   },
   {
     title: "Listings",
@@ -59,6 +71,31 @@ const MENU_CONFIG: MenuItem[] = [
     url: "/dashboard/claim",
     icon: Files,
     roles: ["admin"],
+  },
+  {
+    title: "Agent Operations",
+    icon: Files,
+    roles: ["admin"],
+    children: [
+      {
+        title: "Stewardship Queue",
+        url: "/dashboard/agent-operations/stewardship",
+        icon: Files,
+        roles: ["admin"],
+      },
+      {
+        title: "Listing Revisions",
+        url: "/dashboard/agent-operations/revisions",
+        icon: Files,
+        roles: ["admin"],
+      },
+      {
+        title: "Duplicate Collisions",
+        url: "/dashboard/agent-operations/duplicates",
+        icon: Files,
+        roles: ["admin"],
+      },
+    ],
   },
 
   // ─── Categories (Admin) ───
@@ -161,7 +198,7 @@ const MENU_CONFIG: MenuItem[] = [
     title: "Settings",
     url: "/dashboard/settings",
     icon: "/images/icons/setting.svg",
-    roles: ["vendor", "customer"],
+    roles: ["vendor", "customer", "listing_agent"],
   },
 ];
 

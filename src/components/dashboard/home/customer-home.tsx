@@ -56,7 +56,10 @@ interface ApiRawItem {
   category?: { name: string } | string;
   categories?: { name: string }[]; // Array support
   images?: (ApiImage | string)[];
+  /** Explicit cover image, when the vendor has set one — authoritative over `images[0]`. */
+  cover?: ApiImage | null;
   image?: string;
+  primary_image?: string;
   cover_image?: string;
   location?: string;
   listing_verified?: boolean;
@@ -293,8 +296,17 @@ export default function CustomerHome() {
                 validImages.push(getImageUrl(item.cover_image));
             }
 
-            const finalImage =
-              validImages.length > 0
+            // The explicit cover always wins over whichever image happens to
+            // be first in `images` — keeps this widget in sync with what
+            // every other page shows for the same listing.
+            const explicitCover =
+              item.cover?.card ||
+              item.cover?.webp ||
+              item.cover?.original ||
+              item.primary_image;
+            const finalImage = explicitCover
+              ? getImageUrl(explicitCover)
+              : validImages.length > 0
                 ? validImages[0]
                 : "/images/no-image.jpg";
 
@@ -344,7 +356,10 @@ export default function CustomerHome() {
                 return !!(img && typeof img === "object" && img.original);
               })
               .map((img: any) => {
-                const mediaPath = typeof img === "string" ? img : img.original;
+                const mediaPath =
+                  typeof img === "string"
+                    ? img
+                    : img.card || img.webp || img.original;
                 return getImageUrl(mediaPath);
               });
 
@@ -354,8 +369,17 @@ export default function CustomerHome() {
                 validImages.push(getImageUrl(item.cover_image));
             }
 
-            const finalImage =
-              validImages.length > 0
+            // The explicit cover always wins over whichever image happens to
+            // be first in `images` — keeps this widget in sync with what
+            // every other page shows for the same listing.
+            const explicitCover =
+              item.cover?.card ||
+              item.cover?.webp ||
+              item.cover?.original ||
+              item.primary_image;
+            const finalImage = explicitCover
+              ? getImageUrl(explicitCover)
+              : validImages.length > 0
                 ? validImages[0]
                 : "/images/no-image.jpg";
 

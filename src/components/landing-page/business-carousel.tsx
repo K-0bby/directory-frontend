@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { BusinessCard, type Business } from "../business-card";
+import { BusinessCard, type Business } from "../ux/business-card";
 import { Button } from "../ui/button";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 

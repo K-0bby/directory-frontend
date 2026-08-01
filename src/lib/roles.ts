@@ -6,7 +6,7 @@ export const ROLE_BASE_PATH = "/dashboard";
 // Default landing page per role (used for redirects after login, role change, etc.)
 export const ROLE_HOME: Record<UserRole, string> = {
   vendor: "/dashboard",
-  listing_agent: "/dashboard/my-listing",
+  listing_agent: "/dashboard/agent",
   admin: "/dashboard",
   customer: "/dashboard",
 } as const;

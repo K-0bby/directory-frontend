@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 
 import { cn } from "@/lib/utils";
@@ -14,11 +15,18 @@ import { ListingFormHandle } from "@/components/dashboard/listing/types";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   isValidUrl,
+  normalizeLaravel422Errors,
   normalizeUrl,
-  parseLaravel422Errors,
 } from "@/lib/directory/utils";
 import { cleanPhone, normalizePhoneInput, validatePhone } from "@/lib/phone";
 import { handleSessionExpired } from "@/lib/session";
+import { useAuth } from "@/context/auth-context";
+import { normalizeRole } from "@/lib/roles";
+import {
+  DuplicateAssessment,
+  runDuplicateListingPreflight,
+} from "@/lib/api";
+import { FormErrorSummary } from "@/components/ui/form-error-summary";
 
 // Phone Input Imports
 import { PhoneInput } from "react-international-phone";
@@ -110,6 +118,8 @@ const basicInfoConfig = {
 
 export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
   ({ listingType, listingSlug, initialName = "", onValidityChange }, ref) => {
+    const { user } = useAuth();
+    const userRole = normalizeRole(user?.role ?? "customer");
     // --- State ---
     const [categories, setCategories] = useState<Category[]>([]);
     const [mainCategories, setMainCategories] = useState<Category[]>([]);
@@ -125,6 +135,10 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
     const [error, setError] = useState<string | null>(null);
     const [primaryIso2, setPrimaryIso2] = useState("gb");
     const [secondaryIso2, setSecondaryIso2] = useState("gb");
+    const [duplicateAssessment, setDuplicateAssessment] =
+      useState<DuplicateAssessment | null>(null);
+    const [duplicateExplanation, setDuplicateExplanation] = useState("");
+    const [submitErrors, setSubmitErrors] = useState<string[]>([]);
 
     // --- Form ---
     const form = useForm<BusinessFormValues>({
@@ -303,6 +317,7 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
     // --- 3. Submit Handler ---
     useImperativeHandle(ref, () => ({
       async submit() {
+        setSubmitErrors([]);
         const isValid = await trigger();
         if (!isValid) {
           toast.error("Please correct the errors in the form.");
@@ -342,7 +357,6 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
         // `sometimes` rule doesn't fire and reject null/empty-string values.
         const submissionData: Record<string, unknown> = {
           name: rawData.name,
-          type: listingType,
           bio: rawData.description,
           description: rawData.description,
           category_ids: rawData.category_ids
@@ -372,6 +386,48 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
         const token = localStorage.getItem("authToken");
 
         try {
+          if (!listingSlug && userRole === "listing_agent") {
+            const assessment = await runDuplicateListingPreflight(
+              {
+                type: listingType,
+                name: rawData.name,
+                ...(rawData.email ? { email: rawData.email } : {}),
+                ...(cleanedPrimaryPhone
+                  ? { primary_phone: cleanedPrimaryPhone }
+                  : {}),
+                ...(normalizeUrl(rawData.website || "")
+                  ? { website: normalizeUrl(rawData.website || "") }
+                  : {}),
+                ...(rawData.business_reg_num
+                  ? { business_reg_num: rawData.business_reg_num }
+                  : {}),
+              },
+              token ?? undefined,
+            );
+
+            setDuplicateAssessment(assessment);
+            if (
+              assessment.requires_explanation &&
+              duplicateExplanation.trim().length < 10
+            ) {
+              toast.warning(
+                "Review the possible duplicate and explain why this is a separate listing.",
+              );
+              return false;
+            }
+
+            submissionData.duplicate_assessment_id = assessment.assessment_id;
+            if (assessment.requires_explanation) {
+              submissionData.duplicate_explanation =
+                duplicateExplanation.trim();
+            }
+          }
+
+          // Listing type is immutable after creation. Sending it during an
+          // update can produce a hidden-field 422 if stale route/form state
+          // disagrees with the canonical listing.
+          if (!listingSlug) submissionData.type = listingType;
+
           const endpoint = listingSlug
             ? `/api/listing/${listingSlug}/update`
             : `/api/listing/profile`;
@@ -393,13 +449,28 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
           if (!res.ok) {
             if (handleSessionExpired(res.status)) return false;
             if (res.status === 422 && json.errors) {
-              const fieldErrors = parseLaravel422Errors(json.errors);
-              Object.entries(fieldErrors).forEach(([field, message]) => {
-                form.setError(field as keyof BusinessFormValues, { message });
+              const normalized = normalizeLaravel422Errors(json.errors, {
+                phone: "primary_phone",
+                primary_country_code: "primary_phone",
+                secondary_country_code: "secondary_phone",
               });
-              toast.error("Please correct the highlighted fields.");
+              normalized.forEach(({ field, message }) => {
+                if (field in rawData) {
+                  form.setError(field as keyof BusinessFormValues, { message });
+                }
+              });
+              const messages = normalized.map(({ message }) => message);
+              setSubmitErrors(messages);
+              toast.error(messages[0] || json.message || json.error || "Please check the form.", {
+                description:
+                  messages.length > 1
+                    ? `${messages.length - 1} more issue${messages.length === 2 ? "" : "s"} shown in the form.`
+                    : undefined,
+              });
             } else {
-              toast.error(json.error || json.message || "Submission failed");
+              const message = json.message || json.error || "Submission failed";
+              setSubmitErrors([message]);
+              toast.error(message);
             }
             return false;
           }
@@ -471,6 +542,57 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
                 : "Tell us about your community. Your community page will not appear in search results until the information provided has been verified and approved by our moderators. Once it is approved, you'll receive instructions on how to go live."}
           </p>
         </div>
+
+        <FormErrorSummary errors={submitErrors} />
+
+        {!listingSlug && duplicateAssessment?.requires_explanation && (
+          <div
+            className={`rounded-xl border p-4 ${
+              duplicateAssessment.requires_admin_resolution
+                ? "border-red-200 bg-red-50"
+                : "border-amber-200 bg-amber-50"
+            }`}
+          >
+            <h3 className="font-semibold text-slate-950">
+              {duplicateAssessment.requires_admin_resolution
+                ? "Strong identity collision"
+                : "Possible duplicate"}
+            </h3>
+            <p className="mt-1 text-sm text-slate-700">
+              Check the public candidates below. Continuing requires a clear
+              explanation, and strong collisions require explicit moderator
+              resolution.
+            </p>
+            <div className="mt-3 space-y-2">
+              {duplicateAssessment.candidates.map((candidate) => (
+                <div
+                  key={candidate.listing_id}
+                  className="rounded-lg border border-black/10 bg-white/80 p-3 text-sm"
+                >
+                  <p className="font-medium">{candidate.title}</p>
+                  <p className="text-xs text-slate-600">
+                    {candidate.listing_type} ·{" "}
+                    {candidate.locality || "Location not available"} · Matched:{" "}
+                    {candidate.matched_signals.join(", ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <label className="mt-4 block text-sm font-medium" htmlFor="duplicate-explanation">
+              Why should this listing continue?
+            </label>
+            <Textarea
+              id="duplicate-explanation"
+              value={duplicateExplanation}
+              onChange={(event) => setDuplicateExplanation(event.target.value)}
+              minLength={10}
+              maxLength={2000}
+              rows={3}
+              className="mt-1 bg-white"
+              placeholder="For example: this is a separate branch in a different locality…"
+            />
+          </div>
+        )}
 
         {/* Listing Type (Hidden) */}
         <div className="space-y-1 hidden">

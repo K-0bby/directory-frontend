@@ -26,7 +26,7 @@ import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
 import { useRolePath } from "@/hooks/useRolePath";
 import { Input } from "@/components/ui/input";
-import { getImageUrl } from "@/lib/directory/image-utils";
+import { processImages, resolveCoverUrl } from "@/lib/directory/image-utils";
 
 // --- Interfaces ---
 
@@ -35,6 +35,7 @@ interface ListingImage {
   original: string;
   thumb: string;
   webp: string;
+  card?: string;
   mime_type?: string;
 }
 
@@ -62,6 +63,9 @@ interface ApiListing {
   creator_status?: string;
   type?: string;
   images: ListingImage[];
+  cover?: ListingImage | null;
+  primary_image?: string;
+  cover_image?: string;
   categories: Category[];
   rating: number;
   ratings_count: number;
@@ -289,15 +293,16 @@ export default function MyListingsPage() {
 
       const transformedListings: ListingsTableItem[] = rawListings.map(
         (listing) => {
-          const rawImages = listing.images || [];
-          const validImages = rawImages
-            .filter((img) => !!img.original)
-            .map((img) => getImageUrl(img.original));
-
-          const coverImage =
-            validImages.length > 0
-              ? validImages[0]
-              : getImageUrl("/images/no-image.jpg");
+          // The explicit cover always wins over whichever image happens to
+          // be first in `images` — keeps this table in sync with what every
+          // other page shows.
+          const validImages = processImages(listing.images, [
+            resolveCoverUrl(listing.cover),
+            listing.primary_image,
+            listing.cover_image,
+          ]);
+          const coverImage = validImages[0];
+          const orderedImages = validImages;
 
           const categoryText = formatCategoryPath(
             listing.categories,
@@ -331,7 +336,7 @@ export default function MyListingsPage() {
             slug: listing.slug,
             name: listing.name,
             image: coverImage,
-            allImages: validImages,
+            allImages: orderedImages,
             category: categoryText,
             location: location,
             status: status,

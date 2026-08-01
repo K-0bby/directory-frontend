@@ -56,7 +56,28 @@ export interface User {
   name: string;
   email: string;
   role?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  country_code?: string;
+  image?: string | null;
   createdAt?: string;
+}
+
+export class ProfileSettingsApiError extends Error {
+  constructor(
+    message: string,
+    readonly errors: Record<string, string[]> = {},
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "ProfileSettingsApiError";
+  }
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface Category {
@@ -269,6 +290,63 @@ export async function updateUser(data: Partial<User>, token?: string): Promise<U
   }
 
   return response.json();
+}
+
+export async function updateUserProfile(
+  data: FormData,
+  token?: string,
+): Promise<User> {
+  const response = await fetch("/api/update_user", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: data,
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    message?: string;
+    errors?: Record<string, string[]>;
+    data?: User;
+  };
+  if (!response.ok) {
+    throw new ProfileSettingsApiError(
+      payload.message || "Failed to update profile",
+      payload.errors,
+      response.status,
+    );
+  }
+  if (!payload.data) {
+    throw new ProfileSettingsApiError("Profile response was incomplete");
+  }
+  return payload.data;
+}
+
+export async function changePassword(
+  input: ChangePasswordInput,
+  token?: string,
+): Promise<void> {
+  const response = await fetch("/api/change_password", {
+    method: "PUT",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({
+      current_password: input.currentPassword,
+      new_password: input.newPassword,
+    }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    message?: string;
+    error?: string;
+    errors?: Record<string, string[]>;
+  };
+  if (!response.ok) {
+    throw new ProfileSettingsApiError(
+      payload.message || payload.error || "Failed to change password",
+      payload.errors,
+      response.status,
+    );
+  }
 }
 
 // ============================================================================
@@ -903,6 +981,7 @@ export interface ClaimCaseAdmin {
     type: string;
     status: string;
     claim_status: string;
+    has_open_agent_revision: boolean;
   };
   claimant: { id: number; name: string; email: string; role: string };
   current_owner: { id: number; name: string } | null;
@@ -1089,10 +1168,17 @@ export async function adminGetClaim(claimId: number | string, token?: string): P
   return response.json();
 }
 
-export async function adminApproveClaim(claimId: number | string, token?: string): Promise<{ message: string }> {
+export async function adminApproveClaim(
+  claimId: number | string,
+  acknowledgeRevisionCancellation: boolean,
+  token?: string,
+): Promise<{ message: string }> {
   const response = await fetch(`/api/admin/claims/${claimId}/approve`, {
     method: 'PATCH',
     headers: getAuthHeaders(token),
+    body: JSON.stringify({
+      acknowledge_revision_cancellation: acknowledgeRevisionCancellation,
+    }),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -1531,4 +1617,649 @@ export async function updateListingFormProgress(
     body: JSON.stringify({ step, state }),
   });
   if (!response.ok) throw await mediaApiError(response, "Could not save form progress");
+}
+
+// ============================================================================
+// LISTING AGENT LIFECYCLE V1
+// ============================================================================
+
+export type AgentListingState =
+  | "draft"
+  | "pending"
+  | "changes_requested"
+  | "approved"
+  | "rejected"
+  | "suspended";
+
+export type AgentClaimState =
+  | "unclaimed"
+  | "claim_in_progress"
+  | "claimed";
+
+export interface AgentWorkListing {
+  id: number;
+  slug: string;
+  name: string;
+  listing_type: "business" | "event" | "community";
+  listing_state: AgentListingState;
+  revision_state:
+    | "draft"
+    | "pending"
+    | "changes_requested"
+    | "approved"
+    | "rejected"
+    | "cancelled_ownership_handoff"
+    | "superseded"
+    | null;
+  claim_state: AgentClaimState;
+  source_count: number;
+  last_updated_at: string;
+  available_next_action:
+    | "read_only_history"
+    | "edit_or_submit"
+    | "await_moderation_or_edit"
+    | "edit_and_resubmit"
+    | "continue_revision"
+    | "maintain_through_revision"
+    | "read_only";
+  ownership_handed_over_at?: string | null;
+}
+
+export interface AgentMetrics {
+  created: number;
+  submitted: number;
+  approved: number;
+  changes_requested: number;
+  rejected: number;
+  approval_rate: number | null;
+  currently_unclaimed: number;
+  claimed: number;
+  median_moderation_turnaround_seconds: number | null;
+  duplicate_warning_rate: number | null;
+  historical_coverage_notice: string;
+}
+
+export interface AgentWorkResponse {
+  data: AgentWorkListing[];
+  links?: {
+    first?: string | null;
+    last?: string | null;
+    prev?: string | null;
+    next?: string | null;
+  };
+  meta?: {
+    current_page?: number;
+    last_page?: number;
+    per_page?: number;
+    total?: number;
+  };
+}
+
+export interface AgentWorkQuery {
+  state?: AgentListingState | AgentClaimState;
+  q?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export interface GrandfatheredOwnedListing {
+  id: number;
+  slug: string;
+  name: string;
+  type: "business" | "event" | "community";
+  status: AgentListingState;
+  country?: string | null;
+  city?: string | null;
+  images?: Array<{ original: string; thumb: string; webp: string }>;
+}
+
+export interface DuplicateCandidate {
+  listing_id: number;
+  title: string;
+  listing_type: "business" | "event" | "community";
+  locality: string;
+  matched_signals: string[];
+  confidence_band: "probable_duplicate" | "strong_identity_collision";
+  public_url: string;
+}
+
+export interface DuplicateAssessment {
+  assessment_id: number;
+  warning_level:
+    | "probable_duplicate"
+    | "strong_identity_collision"
+    | null;
+  requires_explanation: boolean;
+  requires_admin_resolution: boolean;
+  candidates: DuplicateCandidate[];
+  matched_signals: string[];
+  created_at: string;
+}
+
+export interface DuplicatePreflightInput {
+  type: "business" | "event" | "community";
+  name: string;
+  country?: string;
+  city?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  email?: string;
+  primary_phone?: string;
+  website?: string;
+  business_reg_num?: string;
+  registration_authority?: string;
+  event_start_date?: string;
+  event_venue?: string;
+}
+
+export interface ListingSource {
+  id: number;
+  url: string;
+  domain: string;
+  source_type:
+    | "official_website"
+    | "official_social"
+    | "government_registry"
+    | "reputable_directory"
+    | "ticket_platform"
+    | "news_source"
+    | "other";
+  is_primary: boolean;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListingInternalNote {
+  id: number;
+  body: string | null;
+  author_id: number;
+  is_purged: boolean;
+  purged_at: string | null;
+  retention_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminStewardshipQueueItem {
+  listing_id: number;
+  slug: string;
+  name: string;
+  listing_state: AgentListingState;
+  revision_state: AgentWorkListing["revision_state"];
+  claim_state: AgentClaimState;
+  stewardship_state:
+    | "assigned_available"
+    | "assigned_unavailable"
+    | "unassigned"
+    | "ended";
+  current_steward: { id: number; name: string } | null;
+  previous_steward: { id: number; end_reason: string } | null;
+  last_update: string;
+  unavailable_since: string | null;
+}
+
+export interface EligibleStewardshipAgent {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface AdminPendingRevision {
+  id: number;
+  listing: {
+    id: number;
+    slug: string;
+    name: string;
+    type: "business" | "event" | "community";
+    status: string;
+    content_version: number;
+    ownership_state: "owned" | "unowned";
+  };
+  base_content_version: number;
+  revision_version: number;
+  status: "pending";
+  proposed_changes: Record<string, unknown>;
+  proposed_relationship_state: Record<string, unknown>;
+  media_revision_id: number | null;
+  created_by: { id: number; name: string };
+  submitted_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ListingContentRevision {
+  id: number;
+  listing_id: number;
+  base_content_version: number;
+  revision_version: number;
+  status:
+    | "draft"
+    | "pending"
+    | "changes_requested"
+    | "approved"
+    | "rejected"
+    | "cancelled_ownership_handoff"
+    | "superseded";
+  proposed_changes: Record<string, unknown>;
+  proposed_relationship_state: Record<string, unknown>;
+  media_revision_id: number | null;
+  moderation_reason: string | null;
+  submitted_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AdminDuplicateAssessment {
+  assessment_id: number;
+  listing: {
+    id: number;
+    slug: string;
+    name: string;
+    type: "business" | "event" | "community";
+    status: string;
+  };
+  warning_level: "strong_identity_collision";
+  candidates: DuplicateCandidate[];
+  matched_signals: string[];
+  agent_explanation: string | null;
+  created_at: string;
+}
+
+export interface OperationsPaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface PaginatedOperationsResponse<T> {
+  data: T[];
+  links: {
+    first: string | null;
+    last: string | null;
+    prev: string | null;
+    next: string | null;
+  };
+  meta: OperationsPaginationMeta;
+}
+
+export interface OperationsQuery {
+  q?: string;
+  page?: number;
+  perPage?: number;
+}
+
+function agentAuthHeaders(token?: string): HeadersInit {
+  return {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function lifecycleApiError(
+  response: Response,
+  fallback: string,
+): Promise<ApiRequestError> {
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+  };
+  return new ApiRequestError(
+    payload.error || payload.message || fallback,
+    response.status,
+  );
+}
+
+export async function getAgentWork(
+  token?: string,
+  query: AgentWorkQuery = {},
+): Promise<AgentWorkResponse> {
+  const params = new URLSearchParams({
+    page: String(query.page ?? 1),
+    per_page: String(query.perPage ?? 20),
+  });
+  if (query.state) params.set("state", query.state);
+  if (query.q?.trim()) params.set("q", query.q.trim());
+  const response = await fetch(`/api/agent/listings?${params}`, {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load agent listings");
+  }
+  return response.json() as Promise<AgentWorkResponse>;
+}
+
+export async function getAgentMetrics(token?: string): Promise<AgentMetrics> {
+  const response = await fetch("/api/agent/metrics", {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load agent metrics");
+  }
+  const payload = (await response.json()) as { data?: AgentMetrics } & AgentMetrics;
+  return payload.data ?? payload;
+}
+
+export async function getGrandfatheredOwnedListings(
+  token?: string,
+  page = 1,
+): Promise<{ data: GrandfatheredOwnedListing[] }> {
+  const response = await fetch(`/api/agent/owned_listings?page=${page}`, {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(
+      response,
+      "Could not load grandfathered owned listings",
+    );
+  }
+  return response.json() as Promise<{ data: GrandfatheredOwnedListing[] }>;
+}
+
+export async function runDuplicateListingPreflight(
+  input: DuplicatePreflightInput,
+  token?: string,
+): Promise<DuplicateAssessment> {
+  const response = await fetch("/api/agent/listings/duplicate_preflight", {
+    method: "POST",
+    headers: agentAuthHeaders(token),
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Duplicate check failed");
+  }
+  const payload = (await response.json()) as { data: DuplicateAssessment };
+  return payload.data;
+}
+
+export async function getListingSources(
+  slug: string,
+  token?: string,
+): Promise<ListingSource[]> {
+  const response = await fetch(`/api/listing/${encodeURIComponent(slug)}/sources`, {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load private sources");
+  }
+  const payload = (await response.json()) as { data: ListingSource[] };
+  return payload.data;
+}
+
+export async function createListingSource(
+  slug: string,
+  input: Pick<ListingSource, "url" | "source_type" | "is_primary">,
+  token?: string,
+): Promise<ListingSource> {
+  const response = await fetch(`/api/listing/${encodeURIComponent(slug)}/sources`, {
+    method: "POST",
+    headers: agentAuthHeaders(token),
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not add source");
+  }
+  const payload = (await response.json()) as { data: ListingSource };
+  return payload.data;
+}
+
+export async function getListingInternalNotes(
+  slug: string,
+  token?: string,
+): Promise<ListingInternalNote[]> {
+  const response = await fetch(
+    `/api/listing/${encodeURIComponent(slug)}/internal_notes`,
+    {
+      headers: agentAuthHeaders(token),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load internal notes");
+  }
+  const payload = (await response.json()) as { data: ListingInternalNote[] };
+  return payload.data;
+}
+
+export async function createListingInternalNote(
+  slug: string,
+  body: string,
+  token?: string,
+): Promise<ListingInternalNote> {
+  const response = await fetch(
+    `/api/listing/${encodeURIComponent(slug)}/internal_notes`,
+    {
+      method: "POST",
+      headers: agentAuthHeaders(token),
+      body: JSON.stringify({ body }),
+    },
+  );
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not add internal note");
+  }
+  const payload = (await response.json()) as { data: ListingInternalNote };
+  return payload.data;
+}
+
+function operationsParams(query: OperationsQuery): URLSearchParams {
+  const params = new URLSearchParams({
+    page: String(query.page ?? 1),
+    per_page: String(query.perPage ?? 20),
+  });
+  if (query.q?.trim()) params.set("q", query.q.trim());
+  return params;
+}
+
+export async function getAdminStewardshipQueue(
+  token?: string,
+  query: OperationsQuery = {},
+): Promise<PaginatedOperationsResponse<AdminStewardshipQueueItem>> {
+  const params = operationsParams(query);
+  const response = await fetch(`/api/admin/stewardship/unassigned_queue?${params}`, {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load stewardship queue");
+  }
+  return response.json() as Promise<PaginatedOperationsResponse<AdminStewardshipQueueItem>>;
+}
+
+export async function getEligibleStewardshipAgents(
+  token?: string,
+): Promise<EligibleStewardshipAgent[]> {
+  const response = await fetch("/api/admin/stewardship/eligible_agents", {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load eligible agents");
+  }
+  const payload = (await response.json()) as {
+    data: EligibleStewardshipAgent[];
+  };
+  return payload.data;
+}
+
+export async function assignListingSteward(
+  slug: string,
+  agentId: number,
+  reassign: boolean,
+  token?: string,
+): Promise<void> {
+  const operation = reassign ? "reassign" : "assign";
+  const response = await fetch(
+    `/api/admin/listings/${encodeURIComponent(slug)}/stewardship/${operation}`,
+    {
+      method: "POST",
+      headers: agentAuthHeaders(token),
+      body: JSON.stringify({ agent_id: agentId }),
+    },
+  );
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not update stewardship");
+  }
+}
+
+export async function getAdminPendingRevisions(
+  token?: string,
+  query: OperationsQuery = {},
+): Promise<PaginatedOperationsResponse<AdminPendingRevision>> {
+  const params = operationsParams(query);
+  const response = await fetch(`/api/admin/revisions?${params}`, {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load pending revisions");
+  }
+  return response.json() as Promise<PaginatedOperationsResponse<AdminPendingRevision>>;
+}
+
+export async function decideAdminListingRevision(
+  revision: AdminPendingRevision,
+  decision: "approve" | "changes_requested" | "reject",
+  reason: string,
+  token?: string,
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/revisions/${revision.id}/decision`,
+    {
+      method: "PATCH",
+      headers: agentAuthHeaders(token),
+      body: JSON.stringify({
+        decision,
+        reason: reason.trim() || undefined,
+        expected_listing_content_version: revision.listing.content_version,
+        expected_revision_version: revision.revision_version,
+      }),
+    },
+  );
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not decide revision");
+  }
+}
+
+export async function getOpenListingRevision(
+  slug: string,
+  token?: string,
+): Promise<ListingContentRevision | null> {
+  const response = await fetch(
+    `/api/listing/${encodeURIComponent(slug)}/open_revision`,
+    {
+      headers: agentAuthHeaders(token),
+      cache: "no-store",
+    },
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not load open revision");
+  }
+  const payload = (await response.json()) as { data: ListingContentRevision };
+  return payload.data;
+}
+
+export async function createListingContentRevision(
+  slug: string,
+  token?: string,
+): Promise<ListingContentRevision> {
+  const response = await fetch(
+    `/api/listing/${encodeURIComponent(slug)}/revisions`,
+    {
+      method: "POST",
+      headers: agentAuthHeaders(token),
+      body: JSON.stringify({}),
+    },
+  );
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not open revision");
+  }
+  const payload = (await response.json()) as { data: ListingContentRevision };
+  return payload.data;
+}
+
+export async function updateListingContentRevision(
+  revision: ListingContentRevision,
+  proposedChanges: Record<string, unknown>,
+  token?: string,
+): Promise<ListingContentRevision> {
+  const response = await fetch(`/api/revisions/${revision.id}`, {
+    method: "PATCH",
+    headers: agentAuthHeaders(token),
+    body: JSON.stringify({
+      expected_revision_version: revision.revision_version,
+      proposed_changes: proposedChanges,
+    }),
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not save revision");
+  }
+  const payload = (await response.json()) as { data: ListingContentRevision };
+  return payload.data;
+}
+
+export async function submitListingContentRevision(
+  revision: ListingContentRevision,
+  token?: string,
+): Promise<ListingContentRevision> {
+  const operation =
+    revision.status === "changes_requested" ? "resubmit" : "submit";
+  const response = await fetch(
+    `/api/revisions/${revision.id}/${operation}`,
+    {
+      method: "POST",
+      headers: agentAuthHeaders(token),
+      body: JSON.stringify({}),
+    },
+  );
+  if (!response.ok) {
+    throw await lifecycleApiError(response, "Could not submit revision");
+  }
+  const payload = (await response.json()) as { data: ListingContentRevision };
+  return payload.data;
+}
+
+export async function getAdminDuplicateAssessments(
+  token?: string,
+  query: OperationsQuery = {},
+): Promise<PaginatedOperationsResponse<AdminDuplicateAssessment>> {
+  const params = operationsParams(query);
+  const response = await fetch(`/api/admin/duplicate_assessments?${params}`, {
+    headers: agentAuthHeaders(token),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await lifecycleApiError(
+      response,
+      "Could not load duplicate assessments",
+    );
+  }
+  return response.json() as Promise<PaginatedOperationsResponse<AdminDuplicateAssessment>>;
+}
+
+export async function resolveAdminDuplicateAssessment(
+  assessmentId: number,
+  resolution: "distinct" | "duplicate",
+  reason: string,
+  token?: string,
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/duplicate_assessments/${assessmentId}/resolve`,
+    {
+      method: "PATCH",
+      headers: agentAuthHeaders(token),
+      body: JSON.stringify({ resolution, reason }),
+    },
+  );
+  if (!response.ok) {
+    throw await lifecycleApiError(
+      response,
+      "Could not resolve duplicate assessment",
+    );
+  }
 }
