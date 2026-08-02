@@ -7,7 +7,8 @@
     "build": "NODE_PATH=$PWD/node_modules next build",
     "start": "NODE_NO_WARNINGS=1 NODE_PATH=$PWD/node_modules next start",
     "lint": "eslint",
-    "verify:analytics-routes": "node scripts/verify-analytics-route-parity.mjs"
+    "verify:analytics-routes": "node scripts/verify-analytics-route-parity.mjs",
+    "verify:private-api-cache": "node scripts/verify-private-api-cache.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
