@@ -73,8 +73,33 @@ export interface MediaSaveOptions {
   coverAltText?: string;
   galleryAltTexts?: string[];
   token?: string;
-  onFileProgress?: (fileName: string, percent: number) => void;
+  /**
+   * Reports progress across the whole batch. `overallPercent` is computed
+   * here rather than by the caller because this is the only place that knows
+   * the full upload list — deriving it caller-side from per-file percentages
+   * would mean keying on filenames, which collide in practice (two phones
+   * both produce `IMG_0001.jpeg`).
+   */
+  onProgress?: (progress: MediaSaveProgress) => void;
   signal?: AbortSignal;
+}
+
+/**
+ * `uploading` covers pushing bytes to storage; `processing` is the
+ * server-side normalization that follows, which has no byte-level progress
+ * to report but can take a noticeable amount of time.
+ */
+export type MediaSavePhase = "uploading" | "processing";
+
+export interface MediaSaveProgress {
+  phase: MediaSavePhase;
+  /** 1-based index of the file currently uploading. */
+  fileIndex: number;
+  totalFiles: number;
+  /** Progress of the current file, 0-100. */
+  filePercent: number;
+  /** Progress across the entire batch, 0-100. */
+  overallPercent: number;
 }
 
 /**
@@ -102,7 +127,7 @@ export async function saveListingMediaAtomic(options: MediaSaveOptions): Promise
 }
 
 async function attemptListingMediaSave(options: MediaSaveOptions): Promise<MediaSaveResult> {
-  const { listingSlug, cover, fallbackCover, gallery, coverAltText, galleryAltTexts, token, onFileProgress, signal } = options;
+  const { listingSlug, cover, fallbackCover, gallery, coverAltText, galleryAltTexts, token, onProgress, signal } = options;
 
   const revision = await createMediaRevision(listingSlug, token);
 
@@ -117,7 +142,7 @@ async function attemptListingMediaSave(options: MediaSaveOptions): Promise<Media
       if (isFile(slot)) uploads.push({ file: slot, role: "gallery" });
     });
 
-    for (const { file, role } of uploads) {
+    for (const [index, { file, role }] of uploads.entries()) {
       try {
         const stage = await stageRevisionItem(
           revision.id,
@@ -131,7 +156,16 @@ async function attemptListingMediaSave(options: MediaSaveOptions): Promise<Media
           token,
         );
         await uploadRevisionItemFile(revision.id, stage, file, token, (pct) => {
-          onFileProgress?.(file.name, pct);
+          onProgress?.({
+            phase: "uploading",
+            fileIndex: index + 1,
+            totalFiles: uploads.length,
+            filePercent: pct,
+            // Each file is treated as an equal share of the batch. Weighting
+            // by byte size would be more precise, but the compressed sizes
+            // aren't known until each upload starts.
+            overallPercent: Math.round((index * 100 + pct) / uploads.length / 100 * 100),
+          });
         }, signal);
         stagedIds.set(file, stage.item_id);
       } catch (error) {
@@ -148,6 +182,13 @@ async function attemptListingMediaSave(options: MediaSaveOptions): Promise<Media
 
     // Wait for server-side normalization of every staged item.
     if (uploads.length > 0) {
+      onProgress?.({
+        phase: "processing",
+        fileIndex: uploads.length,
+        totalFiles: uploads.length,
+        filePercent: 100,
+        overallPercent: 100,
+      });
       const deadline = Date.now() + POLL_TIMEOUT_MS;
       let pollInterval = POLL_INTERVAL_MS;
       for (;;) {

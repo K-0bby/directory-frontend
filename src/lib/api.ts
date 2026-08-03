@@ -2037,6 +2037,7 @@ export interface AdminStewardshipQueueItem {
     | "assigned_unavailable"
     | "unassigned"
     | "ended";
+  created_by: { id: number; name: string; email: string } | null;
   current_steward: { id: number; name: string } | null;
   previous_steward: { id: number; end_reason: string } | null;
   last_update: string;
