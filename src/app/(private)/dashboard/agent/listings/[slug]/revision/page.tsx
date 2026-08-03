@@ -1,4 +1,4 @@
-import AgentContentRevision from "@/components/dashboard/listing/agent-content-revision";
+import { redirect } from "next/navigation";
 
 interface AgentContentRevisionPageProps {
   params: Promise<{ slug: string }>;
@@ -8,5 +8,5 @@ export default async function AgentContentRevisionPage({
   params,
 }: AgentContentRevisionPageProps) {
   const { slug } = await params;
-  return <AgentContentRevision slug={slug} />;
+  redirect(`/dashboard/agent/listings/${encodeURIComponent(slug)}`);
 }

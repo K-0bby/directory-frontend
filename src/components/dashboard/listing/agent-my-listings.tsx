@@ -76,17 +76,9 @@ function claimClass(state: AgentClaimState): string {
 }
 
 function actionLabel(listing: AgentWorkListing): string {
-  return (
-    {
-      read_only_history: "View history",
-      edit_or_submit: "Continue listing",
-      await_moderation_or_edit: "Open workspace",
-      edit_and_resubmit: "Address changes",
-      continue_revision: "Continue revision",
-      maintain_through_revision: "Maintain listing",
-      read_only: "View listing",
-    } as const
-  )[listing.available_next_action];
+  return listing.available_next_action === "read_only_history"
+    ? "View history"
+    : "View listing";
 }
 
 function pageNumbers(current: number, total: number): number[] {
@@ -106,9 +98,6 @@ function ListingBadges({ listing }: { listing: AgentWorkListing }) {
       <Badge className={claimClass(listing.claim_state)}>
         {label(listing.claim_state)}
       </Badge>
-      {listing.revision_state && (
-        <Badge variant="outline">Revision: {label(listing.revision_state)}</Badge>
-      )}
     </div>
   );
 }
@@ -296,7 +285,6 @@ export default function AgentMyListings() {
                       <TableHead className="font-semibold">Listing</TableHead>
                       <TableHead className="font-semibold">Type</TableHead>
                       <TableHead className="font-semibold">Moderation</TableHead>
-                      <TableHead className="font-semibold">Revision</TableHead>
                       <TableHead className="font-semibold">Claim</TableHead>
                       <TableHead className="font-semibold">Sources</TableHead>
                       <TableHead className="font-semibold">Updated</TableHead>
@@ -314,7 +302,6 @@ export default function AgentMyListings() {
                         </TableCell>
                         <TableCell><Badge variant="outline">{label(listing.listing_type)}</Badge></TableCell>
                         <TableCell><Badge className={moderationClass(listing.listing_state)}>{label(listing.listing_state)}</Badge></TableCell>
-                        <TableCell className="text-sm text-gray-600">{label(listing.revision_state)}</TableCell>
                         <TableCell><Badge className={claimClass(listing.claim_state)}>{label(listing.claim_state)}</Badge></TableCell>
                         <TableCell className="text-sm text-gray-600">{listing.source_count}</TableCell>
                         <TableCell className="whitespace-nowrap text-sm text-gray-600">
