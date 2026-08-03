@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useQueryState, parseAsStringEnum } from "nuqs";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -191,11 +190,6 @@ export default function AgentHome() {
                     <div className="text-sm">
                       <p className="text-xs text-slate-500">Moderation</p>
                       <p className="font-medium">{stateLabel(listing.listing_state)}</p>
-                      {listing.revision_state && (
-                        <p className="text-xs text-amber-700">
-                          Revision: {stateLabel(listing.revision_state)}
-                        </p>
-                      )}
                     </div>
                     <div className="text-sm">
                       <p className="text-xs text-slate-500">Claim</p>
@@ -215,7 +209,7 @@ export default function AgentHome() {
                     <div className="flex items-center justify-end">
                       <Button asChild size="sm" variant={handedOver ? "outline" : "default"}>
                         <Link href={`/dashboard/agent/listings/${listing.slug}`}>
-                          {handedOver ? "View history" : "Open workspace"}
+                          {handedOver ? "View history" : "View listing"}
                           <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                       </Button>

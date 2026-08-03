@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -12,8 +11,12 @@ import { Button } from "@/components/ui/button";
 import { useListing } from "@/context/listing-form-context";
 import { ListingFormHandle } from "@/components/dashboard/listing/types";
 import { useRolePath } from "@/hooks/useRolePath";
-import { LISTING_JOURNEYS } from "@/lib/listing-form-v2";
-import { updateListingFormProgress } from "@/lib/api";
+import { LISTING_JOURNEYS, ListingType } from "@/lib/listing-form-v2";
+import {
+  EditableListingData,
+  getEditableListing,
+  updateListingFormProgress,
+} from "@/lib/api";
 
 // Child Forms
 import { BasicInformationForm } from "@/components/dashboard/listing/form/basic-info";
@@ -28,30 +31,11 @@ import {
   useBeforeUnloadWhenDirty,
 } from "@/components/dashboard/listing/listing-dirty-guard";
 
-// --- Local Interfaces to fix 'any' errors ---
-interface ApiCategory {
-  id: string | number;
-  name: string;
-}
-
-interface ApiHour {
-  day_of_week: string;
-  open_time: string;
-  close_time: string;
-}
-
-interface ApiMedia {
-  id?: number;
-  original: string;
-  thumb?: string;
-  webp?: string;
-  kind: "image" | "video";
-  role: "cover" | "gallery";
-  position: number | null;
-  mime_type?: string;
-}
-
 const EDIT_STORAGE_KEY = "listing-edit-step";
+
+function eventValue(data: EditableListingData, key: string): unknown {
+  return data.event?.[key] ?? data[key as keyof EditableListingData];
+}
 
 export default function EditListingContent() {
   const router = useRouter();
@@ -67,8 +51,7 @@ export default function EditListingContent() {
     setBasicInfo,
     setBusinessDetails,
     setMedia,
-    // Socials (Handle safely if context is old)
-    setSocials = (context as any).setSocials || (context as any).setSocialMedia,
+    setSocials,
   } = context;
 
   const [listingSlug, setListingSlug] = useState<string>("");
@@ -79,6 +62,8 @@ export default function EditListingContent() {
   const [pendingStep, setPendingStep] = useState<number | null>(null);
   const [pendingSkip, setPendingSkip] = useState(false);
   const [lastSaveFailed, setLastSaveFailed] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [listingStatus, setListingStatus] = useState<string | null>(null);
   useBeforeUnloadWhenDirty(dirty);
 
   const formRef = useRef<ListingFormHandle>(null);
@@ -101,7 +86,6 @@ export default function EditListingContent() {
     initialized.current = true;
 
     const initPage = async () => {
-      const type = searchParams.get("type");
       const slug = searchParams.get("slug");
 
       if (!slug) {
@@ -112,37 +96,15 @@ export default function EditListingContent() {
 
       setListingSlug(slug);
 
-      try {
-        const stored = JSON.parse(
-          sessionStorage.getItem(EDIT_STORAGE_KEY) || "{}",
-        );
-        if (stored.listingSlug === slug && stored.currentStep > 1) {
-          setCurrentStep(stored.currentStep);
-        }
-      } catch {
-        /* ignore */
-      }
-
-      if (type === "business" || type === "event" || type === "community") {
-        setListingType(type);
-      }
-
       // Fetch Data
       try {
         setIsFetching(true);
+        setLoadError(null);
         const token = localStorage.getItem("authToken");
-
-        const response = await fetch(`/api/listing/${slug}/show`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
-
-        if (!response.ok) throw new Error("Failed to load listing data");
-
-        const json = await response.json();
-        const data = json.data || json;
+        const data = await getEditableListing(slug, token ?? undefined);
+        const canonicalType: ListingType = data.type;
+        setListingType(canonicalType);
+        setListingStatus(data.status);
 
         // --- MAP API DATA TO CONTEXT ---
 
@@ -155,7 +117,7 @@ export default function EditListingContent() {
           UK: "+44",
         };
 
-        const getDialCode = (isoCode: string | null) => {
+        const getDialCode = (isoCode: string | null | undefined) => {
           if (!isoCode) return "+44";
           return countryCodeToDialCode[isoCode] || `+${isoCode}`;
         };
@@ -163,7 +125,7 @@ export default function EditListingContent() {
         setBasicInfo({
           name: data.name,
           category_ids:
-            data.categories?.map((c: ApiCategory) => String(c.id)) || [],
+            data.categories?.map((category) => String(category.id)) || [],
           description: data.bio || data.description,
           type: data.type,
           primary_phone: data.primary_phone || "",
@@ -176,10 +138,12 @@ export default function EditListingContent() {
           website: data.website,
           business_reg_num: data.business_reg_num,
           bio: data.bio,
-        } as any);
+        } as unknown as Parameters<typeof setBasicInfo>[0]);
 
         // 2. Business Details & Hours
-        const mapApiHoursToUi = (apiHours: ApiHour[]) => {
+        const mapApiHoursToUi = (
+          apiHours: NonNullable<EditableListingData["opening_hours"]>,
+        ) => {
           const days = [
             "Monday",
             "Tuesday",
@@ -217,30 +181,22 @@ export default function EditListingContent() {
           google_plus_code: data.google_plus_code,
           businessHours: mapApiHoursToUi(data.opening_hours || []),
           // Event-specific fields (some APIs nest these under data.event)
-          event_price: data.event?.event_price ?? data.event_price ?? "",
-          event_currency:
-            data.event?.event_currency ?? data.event_currency ?? "",
-          event_ticket_url:
-            data.event?.event_ticket_url ?? data.event_ticket_url ?? "",
-          event_online_url:
-            data.event?.event_online_url ?? data.event_online_url ?? "",
-          event_start_date:
-            data.event?.event_start_date ?? data.event_start_date ?? "",
-          event_end_date:
-            data.event?.event_end_date ?? data.event_end_date ?? "",
-          event_start_time:
-            data.event?.event_start_time ?? data.event_start_time ?? "",
-          event_end_time:
-            data.event?.event_end_time ?? data.event_end_time ?? "",
+          event_price: eventValue(data, "event_price") ?? "",
+          event_currency: eventValue(data, "event_currency") ?? "",
+          event_ticket_url: eventValue(data, "event_ticket_url") ?? "",
+          event_online_url: eventValue(data, "event_online_url") ?? "",
+          event_start_date: eventValue(data, "event_start_date") ?? "",
+          event_end_date: eventValue(data, "event_end_date") ?? "",
+          event_start_time: eventValue(data, "event_start_time") ?? "",
+          event_end_time: eventValue(data, "event_end_time") ?? "",
           event_location:
-            data.event?.event_location_type ??
-            data.event_location_type ??
-            data.event_location ??
+            eventValue(data, "event_location_type") ??
+            eventValue(data, "event_location") ??
             "",
-        } as any);
+        } as unknown as Parameters<typeof setBusinessDetails>[0]);
 
         // 3. Social Media
-        if (data.socials && setSocials) {
+        if (data.socials) {
           setSocials({
             facebook: data.socials.facebook || "",
             twitter: data.socials.twitter || "",
@@ -254,7 +210,7 @@ export default function EditListingContent() {
 
         // 4. Media — use explicit roles from the canonical response. Cover
         // status must never be inferred from the compatibility image array.
-        const mapMedia = (item: ApiMedia) => ({
+        const mapMedia = (item: NonNullable<EditableListingData["cover"]>) => ({
           id: item.id,
           original: item.original,
           url: item.original,
@@ -266,19 +222,39 @@ export default function EditListingContent() {
         });
 
         const coverPhoto = data.cover?.original
-          ? mapMedia(data.cover as ApiMedia)
+          ? mapMedia(data.cover)
           : null;
         const galleryItems = Array.isArray(data.gallery)
-          ? (data.gallery as ApiMedia[])
+          ? data.gallery
               .filter((item) => !!item.original)
               .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
               .map(mapMedia)
           : [];
 
         setMedia({ coverPhoto, images: galleryItems });
+        let restoredStep = 1;
+        try {
+          const stored = JSON.parse(
+            sessionStorage.getItem(EDIT_STORAGE_KEY) || "{}",
+          ) as { listingSlug?: string; currentStep?: number };
+          if (
+            stored.listingSlug === slug &&
+            Number.isInteger(stored.currentStep) &&
+            (stored.currentStep ?? 0) >= 1 &&
+            (stored.currentStep ?? 0) <= LISTING_JOURNEYS[canonicalType].length
+          ) {
+            restoredStep = stored.currentStep ?? 1;
+          }
+        } catch {
+          // Ignore corrupt session state and safely restart at the first step.
+        }
+        setCurrentStep(restoredStep);
       } catch (error) {
         console.error("Fetch error:", error);
-        toast.error("Could not load listing details");
+        const message =
+          error instanceof Error ? error.message : "Could not load listing details";
+        setLoadError(message);
+        toast.error(message);
       } finally {
         setIsFetching(false);
         setIsReady(true);
@@ -503,8 +479,30 @@ export default function EditListingContent() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+          <h1 className="text-lg font-semibold text-red-900">Listing unavailable</h1>
+          <p className="mt-2 text-sm text-red-800">{loadError}</p>
+          <div className="mt-5 flex justify-center gap-2">
+            <Button variant="outline" onClick={() => router.push(myListings)}>
+              Back to listings
+            </Button>
+            <Button onClick={() => window.location.reload()}>Try again</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
+      {listingStatus === "approved" && (
+        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm font-medium text-amber-950">
+          This listing is published. Changes saved here are published immediately.
+        </div>
+      )}
       <StepHeader
         currentStep={currentStep}
         totalSteps={totalSteps}
