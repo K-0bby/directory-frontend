@@ -91,8 +91,6 @@ export default function AdminClaimsPage() {
   const [reasonInput, setReasonInput] = useState("");
   const [recommendationInput, setRecommendationInput] = useState("");
   const [instructionsInput, setInstructionsInput] = useState("");
-  const [acknowledgeRevisionCancellation, setAcknowledgeRevisionCancellation] =
-    useState(false);
 
   const getToken = () => localStorage.getItem("authToken") || undefined;
 
@@ -120,24 +118,14 @@ export default function AdminClaimsPage() {
   const handleApprove = async () => {
     if (dialog?.type !== "approve") return;
     const claim = dialog.claim;
-    if (
-      claim.listing.has_open_agent_revision &&
-      !acknowledgeRevisionCancellation
-    ) {
-      toast.error("Acknowledge cancellation of the open agent revision first.");
-      return;
-    }
-
     setProcessingId(claim.id);
     try {
       const data = await adminApproveClaim(
         claim.id,
-        acknowledgeRevisionCancellation,
         getToken(),
       );
       toast.success(data.message || `Claim #${claim.id} approved.`);
       setDialog(null);
-      setAcknowledgeRevisionCancellation(false);
       await fetchClaims();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to approve claim.");
@@ -429,43 +417,18 @@ export default function AdminClaimsPage() {
                   claimants notified. This cannot be undone from this screen.
                 </DialogDescription>
               </DialogHeader>
-              {dialog.claim.listing.has_open_agent_revision && (
-                <label className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={acknowledgeRevisionCancellation}
-                    onChange={(event) =>
-                      setAcknowledgeRevisionCancellation(event.target.checked)
-                    }
-                  />
-                  <span>
-                    <span className="block font-semibold">
-                      This listing has an open agent revision.
-                    </span>
-                    Approving the claim will retain the currently published version
-                    and mark the unpublished revision as cancelled by ownership
-                    handoff. It will be retained for audit and not deleted.
-                  </span>
-                </label>
-              )}
               <DialogFooter>
                 <Button
                   variant="outline"
                   onClick={() => {
                     setDialog(null);
-                    setAcknowledgeRevisionCancellation(false);
                   }}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={handleApprove}
-                  disabled={
-                    processingId === dialog.claim.id ||
-                    (dialog.claim.listing.has_open_agent_revision &&
-                      !acknowledgeRevisionCancellation)
-                  }
+                  disabled={processingId === dialog.claim.id}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
                   {processingId === dialog.claim.id ? (

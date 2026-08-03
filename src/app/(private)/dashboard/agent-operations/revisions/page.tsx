@@ -1,6 +1,5 @@
-import AdminAgentOperations from "@/components/dashboard/admin-agent-operations";
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 export default function RevisionOperationsPage() {
-  return <Suspense fallback={null}><AdminAgentOperations view="revisions" /></Suspense>;
+  redirect("/dashboard/agent-operations/stewardship");
 }

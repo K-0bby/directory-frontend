@@ -51,6 +51,128 @@ export interface Community extends Listing {
   verified: boolean;
 }
 
+export type EditableListingType = "business" | "event" | "community";
+
+export interface EditableListingCategory {
+  id: string | number;
+  name?: string;
+}
+
+export interface EditableListingHour {
+  day_of_week: string;
+  open_time: string;
+  close_time: string;
+}
+
+export interface EditableListingMedia {
+  id?: number;
+  original: string;
+  thumb?: string;
+  webp?: string;
+  card?: string;
+  kind: "image" | "video";
+  role: "cover" | "gallery";
+  position: number | null;
+  mime_type?: string;
+}
+
+export interface EditableListingSocials {
+  facebook?: string | null;
+  twitter?: string | null;
+  instagram?: string | null;
+  linkedin?: string | null;
+  youtube?: string | null;
+  tiktok?: string | null;
+  whatsapp?: string | null;
+}
+
+export interface EditableListingData {
+  slug: string;
+  name: string;
+  type: EditableListingType;
+  status: string;
+  categories?: EditableListingCategory[];
+  bio?: string | null;
+  description?: string | null;
+  primary_phone?: string | null;
+  primary_country_code?: string | null;
+  secondary_phone?: string | null;
+  secondary_country_code?: string | null;
+  email?: string | null;
+  website?: string | null;
+  business_reg_num?: string | null;
+  address?: string | null;
+  country?: string | null;
+  city?: string | null;
+  google_plus_code?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  opening_hours?: EditableListingHour[];
+  socials?: EditableListingSocials | null;
+  cover?: EditableListingMedia | null;
+  gallery?: EditableListingMedia[];
+  event?: Record<string, unknown> | null;
+  event_price?: string | number | null;
+  event_currency?: string | null;
+  event_ticket_url?: string | null;
+  event_online_url?: string | null;
+  event_start_date?: string | null;
+  event_end_date?: string | null;
+  event_start_time?: string | null;
+  event_end_time?: string | null;
+  event_location_type?: string | null;
+  event_location?: string | null;
+  event_venue?: string | null;
+  event_venue_address?: string | null;
+  event_country?: string | null;
+  event_city?: string | null;
+  event_timezone?: string | null;
+  event_timezone_label?: string | null;
+}
+
+export interface ListingManagementCapabilities {
+  can_edit: boolean;
+  can_manage_services: boolean;
+  can_reply_to_reviews: boolean;
+}
+
+export interface ListingManagementData extends EditableListingData {
+  id: number;
+  claim_status?: string | null;
+  rating?: number;
+  ratings_count?: number;
+  views_count?: number;
+  bookmarks_count?: number;
+  services?: ListingService[];
+  business_presence_type?: string | null;
+  business_service_reach?: string | null;
+  service_countries?: Array<{ code: string; name: string }>;
+  community_location_scope?: string | null;
+  community_participation_method?: string | null;
+  capabilities: ListingManagementCapabilities;
+}
+
+export interface ListingService {
+  id: number;
+  slug: string;
+  listing_id: number;
+  name: string;
+  description?: string | null;
+  image?: string | null;
+}
+
+export interface ListingReview {
+  id: number;
+  slug: string;
+  rating: number;
+  comment?: string | null;
+  status: string;
+  vendor_reply?: string | null;
+  vendor_reply_at?: string | null;
+  created_at: string;
+  user?: { first_name?: string | null; last_name?: string | null } | null;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -400,6 +522,124 @@ export async function getListing(slug: string, token?: string): Promise<Listing>
   }
 
   return response.json();
+}
+
+/**
+ * Load the canonical listing payload used by management forms.
+ * The response type is authoritative; URL query parameters are hints only.
+ */
+export async function getEditableListing(
+  slug: string,
+  token?: string,
+): Promise<EditableListingData> {
+  const response = await fetch(`/api/listing/${encodeURIComponent(slug)}/show`, {
+    headers: {
+      ...getAuthHeaders(token),
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: EditableListingData;
+    message?: string;
+  } & Partial<EditableListingData>;
+  if (!response.ok) {
+    throw new ApiRequestError(
+      payload.message || "Could not load listing details",
+      response.status,
+    );
+  }
+
+  const listing = payload.data ?? payload;
+  if (
+    !listing.slug ||
+    !listing.name ||
+    !["business", "event", "community"].includes(String(listing.type))
+  ) {
+    throw new ApiRequestError("Listing response was incomplete or invalid", 500);
+  }
+
+  return listing as EditableListingData;
+}
+
+export async function getListingManagement(
+  slug: string,
+  token?: string,
+): Promise<ListingManagementData> {
+  const response = await fetch(`/api/listing/${encodeURIComponent(slug)}/management`, {
+    headers: { ...getAuthHeaders(token), Accept: "application/json" },
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: ListingManagementData;
+    message?: string;
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new ApiRequestError(payload.message || payload.error || "Could not load listing workspace", response.status);
+  }
+  const listing = payload.data;
+  if (!listing || !listing.slug || !["business", "event", "community"].includes(listing.type) || !listing.capabilities) {
+    throw new ApiRequestError("Listing management response was incomplete or invalid", 500);
+  }
+  return listing;
+}
+
+export async function getListingServices(slug: string, token?: string): Promise<ListingService[]> {
+  const response = await fetch(`/api/listings/${encodeURIComponent(slug)}/services`, {
+    headers: { ...getAuthHeaders(token), Accept: "application/json" },
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => ({}))) as { data?: ListingService[]; message?: string; error?: string };
+  if (!response.ok) throw new ApiRequestError(payload.message || payload.error || "Could not load services", response.status);
+  return Array.isArray(payload.data) ? payload.data : [];
+}
+
+export async function presignListingServiceImage(slug: string, file: File, token?: string): Promise<string> {
+  const response = await fetch(`/api/listings/${encodeURIComponent(slug)}/services/presign`, {
+    method: "POST",
+    headers: { ...getAuthHeaders(token), Accept: "application/json" },
+    body: JSON.stringify({ filename: file.name, mime_type: file.type, size: file.size }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { upload_url?: string; key?: string; message?: string; error?: string };
+  if (!response.ok || !payload.upload_url || !payload.key) throw new ApiRequestError(payload.message || payload.error || "Could not prepare service image", response.status);
+  const upload = await fetch(payload.upload_url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+  if (!upload.ok) throw new ApiRequestError("Could not upload service image", upload.status);
+  return payload.key;
+}
+
+export async function createListingService(slug: string, data: { name: string; description?: string; image_key?: string }, token?: string): Promise<ListingService> {
+  const response = await fetch(`/api/listings/${encodeURIComponent(slug)}/services`, {
+    method: "POST", headers: { ...getAuthHeaders(token), Accept: "application/json" }, body: JSON.stringify(data),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { data?: ListingService; message?: string; error?: string };
+  if (!response.ok || !payload.data) throw new ApiRequestError(payload.message || payload.error || "Could not add service", response.status);
+  return payload.data;
+}
+
+export async function updateListingService(serviceSlug: string, data: { name: string; description?: string; image_key?: string }, token?: string): Promise<ListingService> {
+  const response = await fetch(`/api/services/${encodeURIComponent(serviceSlug)}`, {
+    method: "PUT", headers: { ...getAuthHeaders(token), Accept: "application/json" }, body: JSON.stringify(data),
+  });
+  const payload = (await response.json().catch(() => ({}))) as { data?: ListingService; message?: string; error?: string };
+  if (!response.ok || !payload.data) throw new ApiRequestError(payload.message || payload.error || "Could not update service", response.status);
+  return payload.data;
+}
+
+export async function deleteListingService(serviceSlug: string, token?: string): Promise<void> {
+  const response = await fetch(`/api/services/${encodeURIComponent(serviceSlug)}`, { method: "DELETE", headers: { ...getAuthHeaders(token), Accept: "application/json" } });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+    throw new ApiRequestError(payload.message || payload.error || "Could not delete service", response.status);
+  }
+}
+
+export async function getListingReviews(slug: string): Promise<ListingReview[]> {
+  const response = await fetch(`/api/listing/${encodeURIComponent(slug)}/ratings`, { headers: { Accept: "application/json" }, cache: "no-store" });
+  const payload = (await response.json().catch(() => ({}))) as { data?: ListingReview[]; message?: string; error?: string };
+  if (!response.ok) throw new ApiRequestError(payload.message || payload.error || "Could not load reviews", response.status);
+  return Array.isArray(payload.data) ? payload.data : [];
 }
 
 /**
@@ -1170,14 +1410,15 @@ export async function adminGetClaim(claimId: number | string, token?: string): P
 
 export async function adminApproveClaim(
   claimId: number | string,
-  acknowledgeRevisionCancellation: boolean,
   token?: string,
 ): Promise<{ message: string }> {
   const response = await fetch(`/api/admin/claims/${claimId}/approve`, {
     method: 'PATCH',
     headers: getAuthHeaders(token),
     body: JSON.stringify({
-      acknowledge_revision_cancellation: acknowledgeRevisionCancellation,
+      // Revision creation is paused. This keeps claim handoff safe during the
+      // deployment window if a legacy open revision still exists.
+      acknowledge_revision_cancellation: true,
     }),
   });
 
@@ -1488,7 +1729,9 @@ export async function uploadRevisionItemFile(
     const xhr = new XMLHttpRequest();
     const abortUpload = () => xhr.abort();
     signal?.addEventListener('abort', abortUpload, { once: true });
-    xhr.open('POST', `/api/media_revisions/${revisionId}/items/${stage.item_id}/upload`);
+    // Use the already-established staged-items proxy for local multipart
+    // delivery. The nested /upload proxy remains for older clients.
+    xhr.open('POST', `/api/media_revisions/${revisionId}/items?item_id=${stage.item_id}`);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
@@ -1502,12 +1745,12 @@ export async function uploadRevisionItemFile(
           reject(new ApiRateLimitError(data.message || 'Upload rate limited', retryAfter));
           return;
         }
-        reject(new Error(data.message || 'Upload failed'));
+        reject(new ApiRequestError(data.message || 'Upload failed', xhr.status));
       } catch {
-        reject(new Error('Upload failed'));
+        reject(new ApiRequestError('Upload failed', xhr.status));
       }
     };
-    xhr.onerror = () => reject(new Error('Upload failed'));
+    xhr.onerror = () => reject(new ApiRequestError('Upload failed', xhr.status || 0));
     xhr.onabort = () => reject(new DOMException('Upload cancelled.', 'AbortError'));
     xhr.onloadend = () => signal?.removeEventListener('abort', abortUpload);
     xhr.send(formData);

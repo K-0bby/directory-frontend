@@ -136,6 +136,9 @@ async function attemptListingMediaSave(options: MediaSaveOptions): Promise<Media
         stagedIds.set(file, stage.item_id);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") throw error;
+        if (error instanceof ApiRequestError && (error.status === 404 || error.status === 409)) {
+          throw error;
+        }
         failures.push({
           file,
           message: error instanceof Error ? error.message : "failed to upload.",

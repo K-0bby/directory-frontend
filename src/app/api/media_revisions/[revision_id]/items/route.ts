@@ -11,6 +11,35 @@ export async function POST(
   try {
     const { revision_id } = await params;
     const authHeader = request.headers.get("Authorization");
+    const contentType = request.headers.get("Content-Type") ?? "";
+    const itemId = request.nextUrl.searchParams.get("item_id");
+
+    if (contentType.includes("multipart/form-data")) {
+      if (!itemId || !/^\d+$/.test(itemId)) {
+        return NextResponse.json(
+          { message: "A valid staged media item is required." },
+          { status: 422 },
+        );
+      }
+
+      const uploadBody = await request.formData();
+      const uploadResponse = await fetch(
+        `${API_BASE_URL}/api/media_revisions/${revision_id}/items/${itemId}/upload`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            ...(authHeader && { Authorization: authHeader }),
+          },
+          body: uploadBody,
+        },
+      );
+      const uploadData = await uploadResponse.json().catch(() => ({
+        message: uploadResponse.ok ? "Upload completed." : "Media upload failed.",
+      }));
+      return NextResponse.json(uploadData, { status: uploadResponse.status });
+    }
+
     const body = await request.json().catch(() => ({}));
 
     const response = await fetch(`${API_BASE_URL}/api/media_revisions/${revision_id}/items`, {
