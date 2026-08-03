@@ -12,15 +12,18 @@ import { ArrowLeft, Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
+// Login only checks that a password was entered — length/complexity rules
+// belong on signup and password-reset, where a new password is actually
+// being set. The server is the sole authority on whether an existing
+// password is correct; a client-side length gate here would silently block
+// legitimate accounts whose real password predates the current policy,
+// without ever giving the server a chance to check it.
 const loginSchema = z.object({
   email: z
     .string()
     .min(1, "Email is required")
     .email("Please enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(6, "Password must be at least 6 characters long"),
+  password: z.string().min(1, "Password is required"),
 });
 
 function LoginForm() {
@@ -107,7 +110,7 @@ function LoginForm() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || "These credentials do not match our records.",
+          data.message || "Invalid email and password.",
         );
       }
 
@@ -270,9 +273,6 @@ function LoginForm() {
                 {errors.email && (
                   <p className="text-red-500 text-sm">{errors.email}</p>
                 )}
-                {!errors.email && credentialError && error && (
-                  <p className="text-red-500 text-sm">{error}</p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -322,9 +322,7 @@ function LoginForm() {
                 )}
               </div>
 
-              {error && !credentialError && (
-                <p className="text-red-500 text-sm">{error}</p>
-              )}
+              {error && <p className="text-red-500 text-sm">{error}</p>}
               <Button
                 type="submit"
                 disabled={isLoading}

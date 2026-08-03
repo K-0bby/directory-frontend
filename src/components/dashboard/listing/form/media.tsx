@@ -9,10 +9,15 @@ import { useListing } from "@/context/listing-form-context";
 import { FileUploader } from "@/components/dashboard/listing/media-uploader";
 import { z } from "zod";
 import { handleSessionExpired } from "@/lib/session";
-import { MediaSlotInput, saveListingMediaAtomic } from "@/lib/media-revision";
+import {
+  MediaSaveProgress,
+  MediaSlotInput,
+  saveListingMediaAtomic,
+} from "@/lib/media-revision";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { ProgressRing } from "@/components/ui/progress-ring";
 
 interface Props {
   listingType: "business" | "event" | "community";
@@ -220,6 +225,10 @@ export const MediaUploadStep = forwardRef<ListingFormHandle, Props>(
   ({ listingSlug }, ref) => {
     const { media, setMedia } = useListing();
     const [isUploading, setIsUploading] = useState(false);
+    // Live upload progress, rendered inline beside the uploader rather than
+    // as a toast: a long-running action needs a status surface that stays
+    // anchored to the thing it describes and can't be swiped away mid-flight.
+    const [saveProgress, setSaveProgress] = useState<MediaSaveProgress | null>(null);
     const activeSave = useRef<AbortController | null>(null);
     const [altTexts, setAltTexts] = useState<Record<string, string>>({});
     const [failedFiles, setFailedFiles] = useState<File[]>([]);
@@ -299,7 +308,6 @@ export const MediaUploadStep = forwardRef<ListingFormHandle, Props>(
           return { id: getExistingId(item) as number };
         };
 
-        toast.loading("Saving media…");
         const cover = await toSlot(media.coverPhoto);
         const gallery = await Promise.all(media.images.map(toSlot));
 
@@ -311,8 +319,7 @@ export const MediaUploadStep = forwardRef<ListingFormHandle, Props>(
           coverAltText: accessibilityText(media.coverPhoto),
           galleryAltTexts: media.images.map(accessibilityText),
           token,
-          onFileProgress: (name, pct) =>
-            toast.loading(`Uploading ${name}… ${pct}%`),
+          onProgress: setSaveProgress,
           signal: controller.signal,
         });
 
@@ -332,10 +339,17 @@ export const MediaUploadStep = forwardRef<ListingFormHandle, Props>(
         });
 
         if (result.failures.length > 0) {
-          result.failures.forEach((failure) =>
-            toast.error(`"${failure.file.name}" ${failure.message}`),
+          // One summary toast, not one per file — the failed files are already
+          // marked inline (setFailedFiles), which is where the per-file detail
+          // belongs.
+          const failedCount = result.failures.length;
+          toast.warning(
+            `${failedCount} ${failedCount === 1 ? "file" : "files"} could not be saved`,
+            {
+              description:
+                "Everything else was saved. The files that failed are marked below — retry just those.",
+            },
           );
-          toast.success("The media that worked was saved. Retry only the marked files.");
         } else {
           toast.success("Media saved!");
         }
@@ -353,7 +367,10 @@ export const MediaUploadStep = forwardRef<ListingFormHandle, Props>(
       } finally {
         activeSave.current = null;
         setIsUploading(false);
-        toast.dismiss();
+        setSaveProgress(null);
+        // No blanket toast.dismiss() here: with no id it dismisses *every*
+        // toast, which previously wiped the success/failure message this
+        // function had just shown.
       }
     };
 
@@ -547,17 +564,33 @@ export const MediaUploadStep = forwardRef<ListingFormHandle, Props>(
               </span>
             </div>
             {isUploading && (
-              <div className="mt-3 space-y-3" aria-live="polite">
-                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-blue-600 h-1.5 rounded-full animate-progress w-full origin-left" />
+              <div
+                className="mt-3 flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3"
+                aria-live="polite"
+              >
+                <ProgressRing value={saveProgress?.overallPercent ?? 0} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    {saveProgress?.phase === "processing"
+                      ? "Processing media…"
+                      : "Uploading media…"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {saveProgress?.phase === "processing"
+                      ? "Finishing up — almost done."
+                      : saveProgress
+                        ? `File ${saveProgress.fileIndex} of ${saveProgress.totalFiles}`
+                        : "Preparing files…"}
+                  </p>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
+                  className="shrink-0"
                   onClick={() => activeSave.current?.abort()}
                 >
-                  Cancel media save
+                  Cancel
                 </Button>
               </div>
             )}
