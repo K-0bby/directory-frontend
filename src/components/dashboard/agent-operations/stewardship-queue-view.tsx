@@ -90,6 +90,15 @@ export function StewardshipQueueTable(props: StewardshipQueueViewProps) {
                 <Badge variant="outline">{label(item.listing_state)}</Badge>
                 <Badge variant="outline">claim: {label(item.claim_state)}</Badge>
               </div>
+              {item.created_by ? (
+                <p className="mt-1 break-words text-[10px] text-slate-500">
+                  Creator: {item.created_by.name} ({item.created_by.email})
+                </p>
+              ) : (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Original creator unavailable
+                </p>
+              )}
             </TableCell>
             <TableCell>
               <Badge>{label(item.stewardship_state)}</Badge>
@@ -124,6 +133,15 @@ export function StewardshipQueueCard({
         <Badge variant="outline">{label(item.listing_state)}</Badge>
         <Badge>{label(item.stewardship_state)}</Badge>
       </div>
+      {item.created_by ? (
+        <p className="break-words text-[10px] text-slate-500">
+          Creator: {item.created_by.name} ({item.created_by.email})
+        </p>
+      ) : (
+        <p className="text-[10px] text-slate-500">
+          Original creator unavailable
+        </p>
+      )}
       <p className="text-sm text-slate-600">
         {item.current_steward?.name ?? "Unassigned"}
       </p>
