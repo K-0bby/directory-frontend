@@ -23,7 +23,7 @@ export interface StewardshipQueueViewProps {
   selected: Record<number, string>;
   setSelected: Dispatch<SetStateAction<Record<number, string>>>;
   busy: string | null;
-  onAssign: (item: AdminStewardshipQueueItem) => Promise<void>;
+  onRequestAssignment: (item: AdminStewardshipQueueItem) => void;
 }
 
 function label(value: string | null): string {
@@ -36,11 +36,12 @@ function StewardshipAction({
   selected,
   setSelected,
   busy,
-  onAssign,
+  onRequestAssignment,
 }: StewardshipQueueViewProps & { item: AdminStewardshipQueueItem }) {
   return (
     <div className="flex min-w-64 gap-2">
       <select
+        disabled={busy === `steward-${item.listing_id}`}
         value={selected[item.listing_id] ?? ""}
         onChange={(event) =>
           setSelected((current) => ({
@@ -59,7 +60,7 @@ function StewardshipAction({
       </select>
       <Button
         disabled={busy === `steward-${item.listing_id}`}
-        onClick={() => void onAssign(item)}
+        onClick={() => onRequestAssignment(item)}
       >
         {item.current_steward ? "Reassign" : "Assign"}
       </Button>

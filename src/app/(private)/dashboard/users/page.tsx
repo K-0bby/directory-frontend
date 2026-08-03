@@ -75,9 +75,25 @@ interface User {
   last_active: string;
   status: "Active" | "Pending" | "Suspended" | "Inactive";
   is_suspended?: boolean;
+  role_transition: {
+    allowed_actions: Array<
+      | "make_admin"
+      | "make_user"
+      | "make_listing_agent"
+      | "remove_listing_agent"
+    >;
+    blockers: string[];
+  };
 }
 
 type TabType = "all" | "vendors" | "customers" | "admins" | "listing_agents";
+
+const ROLE_ACTION_TARGETS = {
+  make_admin: { role: "admin", label: "Make Admin" },
+  make_user: { role: "user", label: "Make Customer" },
+  make_listing_agent: { role: "listing_agent", label: "Make Listing Agent" },
+  remove_listing_agent: { role: "user", label: "Remove Agent Access" },
+} as const;
 
 export default function Users() {
   const router = useRouter();
@@ -152,15 +168,15 @@ export default function Users() {
     return data.items || data.users || data.data || data.results || [];
   }, []);
 
-  const loadAllData = useCallback(async () => {
-    if (authLoading) return;
+  const loadAllData = useCallback(async (): Promise<User[]> => {
+    if (authLoading) return [];
     setIsLoading(true);
     setError(null);
     try {
       const token = getAuthToken();
       if (!token) {
         setIsLoading(false);
-        return;
+        return [];
       }
 
       const response = await fetch("/api/all_users", {
@@ -173,11 +189,14 @@ export default function Users() {
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      setAllData(extractUsersFromResponse(data));
+      const users = extractUsersFromResponse(data);
+      setAllData(users);
+      return users;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load users";
       setError(msg);
       toast.error(msg);
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -211,11 +230,9 @@ export default function Users() {
     if (!pendingRoleChange || isActionLoading) return;
 
     const { user: targetUser, requestedRole: newRole } = pendingRoleChange;
-    const requiresReason =
-      targetUser.role === "listing_agent" || newRole === "listing_agent";
     const reason = roleChangeReason.trim();
-    if (requiresReason && !reason) {
-      toast.error("A reason is required for listing-agent role changes.");
+    if (!reason) {
+      toast.error("A reason is required for every role change.");
       return;
     }
 
@@ -256,7 +273,6 @@ export default function Users() {
       // Mapping internal UI role values to API endpoint suffixes
       const endpointSuffixMap: Record<string, string> = {
         admin: "make_admin",
-        vendor: "make_vendor",
         user: "make_user",
         customer: "make_user", // Assuming customer and user share the same endpoint
         listing_agent: "make_listing_agent",
@@ -274,7 +290,7 @@ export default function Users() {
           Authorization: `Bearer ${token}`,
         },
           body: JSON.stringify({
-            reason: newRole === "listing_agent" ? reason : undefined,
+            reason,
           }),
         },
       );
@@ -292,6 +308,15 @@ export default function Users() {
       setRoleChangeReason("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Action failed");
+      const refreshedUsers = await loadAllData();
+      const refreshedTarget = refreshedUsers.find(
+        (user) => user.id === pendingRoleChange.user.id,
+      );
+      if (refreshedTarget) {
+        setPendingRoleChange((current) =>
+          current ? { ...current, user: refreshedTarget } : current,
+        );
+      }
     } finally {
       setIsActionLoading(false);
     }
@@ -449,11 +474,7 @@ export default function Users() {
 
   const roleChangeIsAgentRemoval =
     pendingRoleChange?.user.role === "listing_agent";
-  const roleChangeRequiresReason = Boolean(
-    pendingRoleChange &&
-      (roleChangeIsAgentRemoval ||
-        pendingRoleChange.requestedRole === "listing_agent"),
-  );
+  const roleChangeRequiresReason = pendingRoleChange !== null;
   const roleLabel = (role: UserRole) =>
     (role === "user" || role === "customer" ? "Customer" : role.replace("_", " "))
       .replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -611,29 +632,41 @@ export default function Users() {
                           : "Never"}
                       </TableCell>
                       <TableCell>
-                        {suspended ? (
-                          <Badge className="bg-red-500 hover:bg-red-500 text-white font-normal">
-                            Suspended
-                          </Badge>
-                        ) : (
+                        <div className="space-y-1">
+                          {suspended && (
+                            <Badge className="bg-red-500 font-normal text-white hover:bg-red-500">
+                              Suspended
+                            </Badge>
+                          )}
+                          {u.role_transition?.allowed_actions.length > 0 ? (
                           <Select
                             disabled={isActionLoading}
-                            value={u.role}
+                            value=""
                             onValueChange={(val) => openRoleChangeDialog(u, val)}
                           >
-                            <SelectTrigger className="w-[100px] h-8 text-xs shadow-none border-gray-300 focus:ring-0 rounded-full">
-                              <SelectValue />
+                            <SelectTrigger className="h-8 w-[150px] rounded-full border-gray-300 text-xs shadow-none focus:ring-0">
+                              <span>{roleLabel(u.role)}</span>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="user">User</SelectItem>
-                              <SelectItem value="vendor">Vendor</SelectItem>
-                              <SelectItem value="listing_agent">
-                                Listing Agent
-                              </SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
+                              {u.role_transition.allowed_actions.map((action) => (
+                                <SelectItem
+                                  key={action}
+                                  value={ROLE_ACTION_TARGETS[action].role}
+                                >
+                                  {ROLE_ACTION_TARGETS[action].label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
-                        )}
+                          ) : (
+                            <Badge variant="outline">{roleLabel(u.role)}</Badge>
+                          )}
+                          {u.role_transition?.blockers.map((blocker) => (
+                            <p key={blocker} className="max-w-56 text-[10px] leading-4 text-slate-500">
+                              {blocker}
+                            </p>
+                          ))}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -781,6 +814,14 @@ export default function Users() {
                 </p>
               )}
 
+              {pendingRoleChange.user.role_transition.blockers.length > 0 && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  {pendingRoleChange.user.role_transition.blockers.map((blocker) => (
+                    <p key={blocker}>{blocker}</p>
+                  ))}
+                </div>
+              )}
+
               <p className="text-sm text-slate-600">
                 Active sessions may be revoked so the account’s permissions are
                 re-established under the new role.
@@ -800,12 +841,12 @@ export default function Users() {
                     placeholder={
                       roleChangeIsAgentRemoval
                         ? "Why is listing-agent access being removed?"
-                        : "Why is this user being promoted to listing agent?"
+                        : "Why is this role being changed?"
                     }
                     disabled={isActionLoading}
                   />
                   <p className="text-xs text-slate-500">
-                    Required for the listing-agent audit record.
+                    Required for the administrator role-change audit record.
                   </p>
                 </div>
               )}

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
+  Loader2,
   RefreshCw,
   Search,
   X,
@@ -39,12 +40,30 @@ import {
   DuplicateQueueTable,
 } from "@/components/dashboard/agent-operations/duplicate-queue-view";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 export type AgentOperationsView = "stewardship" | "revisions" | "duplicates";
 
 interface Props {
   view: AgentOperationsView;
+}
+
+interface PendingStewardshipChange {
+  listingId: number;
+  listingName: string;
+  listingSlug: string;
+  operation: "assign" | "reassign";
+  agent: EligibleStewardshipAgent;
+  currentStewardName: string | null;
 }
 
 const EMPTY_META: OperationsPaginationMeta = {
@@ -99,6 +118,8 @@ export default function AdminAgentOperations({ view }: Props) {
   const [selectedAgents, setSelectedAgents] = useState<Record<number, string>>({});
   const [reasons, setReasons] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [pendingStewardship, setPendingStewardship] =
+    useState<PendingStewardshipChange | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -173,21 +194,52 @@ export default function AdminAgentOperations({ view }: Props) {
     }
   }, [loading, meta.last_page, meta.total, page, replaceQuery]);
 
-  async function assign(item: AdminStewardshipQueueItem) {
+  function requestStewardshipChange(item: AdminStewardshipQueueItem) {
     const selected = Number(selectedAgents[item.listing_id]);
     if (!selected) {
       toast.error("Select an eligible agent first.");
       return;
     }
-    setBusy(`steward-${item.listing_id}`);
+
+    const agent = agents.find((candidate) => candidate.id === selected);
+    if (!agent) {
+      toast.error("The selected agent is no longer eligible. Refresh and choose another agent.");
+      return;
+    }
+
+    setPendingStewardship({
+      listingId: item.listing_id,
+      listingName: item.name,
+      listingSlug: item.slug,
+      operation: item.current_steward ? "reassign" : "assign",
+      agent,
+      currentStewardName: item.current_steward?.name ?? null,
+    });
+  }
+
+  async function confirmStewardshipChange() {
+    if (!pendingStewardship || busy) return;
+
+    const pending = pendingStewardship;
+    setBusy(`steward-${pending.listingId}`);
     try {
       await assignListingSteward(
-        item.slug,
-        selected,
-        item.current_steward !== null,
+        pending.listingSlug,
+        pending.agent.id,
+        pending.operation === "reassign",
         localStorage.getItem("authToken") ?? undefined,
       );
-      toast.success("Stewardship updated.");
+      toast.success(
+        pending.operation === "reassign"
+          ? "Stewardship reassigned."
+          : "Stewardship assigned.",
+      );
+      setSelectedAgents((current) => {
+        const next = { ...current };
+        delete next[pending.listingId];
+        return next;
+      });
+      setPendingStewardship(null);
       await load();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Could not update stewardship");
@@ -320,7 +372,7 @@ export default function AdminAgentOperations({ view }: Props) {
                     selected={selectedAgents}
                     setSelected={setSelectedAgents}
                     busy={busy}
-                    onAssign={assign}
+                    onRequestAssignment={requestStewardshipChange}
                   />
                 )}
                 {view === "revisions" && (
@@ -332,7 +384,7 @@ export default function AdminAgentOperations({ view }: Props) {
               </div>
               <div className="divide-y md:hidden">
                 {view === "stewardship" && stewardship.map((item) => (
-                  <StewardshipQueueCard key={item.listing_id} item={item} rows={stewardship} agents={agents} selected={selectedAgents} setSelected={setSelectedAgents} busy={busy} onAssign={assign} />
+                  <StewardshipQueueCard key={item.listing_id} item={item} rows={stewardship} agents={agents} selected={selectedAgents} setSelected={setSelectedAgents} busy={busy} onRequestAssignment={requestStewardshipChange} />
                 ))}
                 {view === "revisions" && revisions.map((item) => (
                   <RevisionQueueCard key={item.id} item={item} rows={revisions} reasons={reasons} setReasons={setReasons} busy={busy} onDecide={decide} />
@@ -365,6 +417,95 @@ export default function AdminAgentOperations({ view }: Props) {
             </div>
           )}
         </section>
+
+        <Dialog
+          open={pendingStewardship !== null}
+          onOpenChange={(open) => {
+            if (!open && !busy) setPendingStewardship(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-md" showCloseButton={!busy}>
+            {pendingStewardship && (
+              <>
+                <DialogHeader>
+                  <DialogTitle>
+                    {pendingStewardship.operation === "reassign"
+                      ? "Confirm stewardship reassignment"
+                      : "Confirm stewardship assignment"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Review the listing and agent before applying this change.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div className="rounded-lg border bg-slate-50 p-4">
+                    <p className="font-medium text-slate-950">
+                      {pendingStewardship.listingName}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {pendingStewardship.listingSlug}
+                    </p>
+                  </div>
+
+                  {pendingStewardship.operation === "reassign" ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        <Badge variant="outline">
+                          {pendingStewardship.currentStewardName ?? "Current steward"}
+                        </Badge>
+                        <span aria-hidden="true" className="text-slate-400">→</span>
+                        <Badge>{pendingStewardship.agent.name}</Badge>
+                      </div>
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        The current stewardship ends immediately when this
+                        reassignment is confirmed.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-700">
+                      <p>Assign this listing to:</p>
+                      <p className="mt-1 font-semibold text-slate-950">
+                        {pendingStewardship.agent.name}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border p-3 text-sm">
+                    <p className="font-medium text-slate-900">
+                      {pendingStewardship.agent.name}
+                    </p>
+                    <p className="break-all text-slate-500">
+                      {pendingStewardship.agent.email}
+                    </p>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    autoFocus
+                    variant="outline"
+                    disabled={Boolean(busy)}
+                    onClick={() => setPendingStewardship(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={Boolean(busy)}
+                    onClick={() => void confirmStewardshipChange()}
+                  >
+                    {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {busy
+                      ? "Updating…"
+                      : pendingStewardship.operation === "reassign"
+                        ? "Confirm reassignment"
+                        : "Confirm assignment"}
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </RoleGuard>
   );
