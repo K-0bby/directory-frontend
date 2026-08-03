@@ -23,7 +23,7 @@ export interface StewardshipQueueViewProps {
   selected: Record<number, string>;
   setSelected: Dispatch<SetStateAction<Record<number, string>>>;
   busy: string | null;
-  onAssign: (item: AdminStewardshipQueueItem) => Promise<void>;
+  onRequestAssignment: (item: AdminStewardshipQueueItem) => void;
 }
 
 function label(value: string | null): string {
@@ -36,11 +36,12 @@ function StewardshipAction({
   selected,
   setSelected,
   busy,
-  onAssign,
+  onRequestAssignment,
 }: StewardshipQueueViewProps & { item: AdminStewardshipQueueItem }) {
   return (
     <div className="flex min-w-64 gap-2">
       <select
+        disabled={busy === `steward-${item.listing_id}`}
         value={selected[item.listing_id] ?? ""}
         onChange={(event) =>
           setSelected((current) => ({
@@ -59,7 +60,7 @@ function StewardshipAction({
       </select>
       <Button
         disabled={busy === `steward-${item.listing_id}`}
-        onClick={() => void onAssign(item)}
+        onClick={() => onRequestAssignment(item)}
       >
         {item.current_steward ? "Reassign" : "Assign"}
       </Button>
@@ -90,6 +91,15 @@ export function StewardshipQueueTable(props: StewardshipQueueViewProps) {
                 <Badge variant="outline">{label(item.listing_state)}</Badge>
                 <Badge variant="outline">claim: {label(item.claim_state)}</Badge>
               </div>
+              {item.created_by ? (
+                <p className="mt-1 break-words text-[10px] text-slate-500">
+                  Creator: {item.created_by.name} ({item.created_by.email})
+                </p>
+              ) : (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Original creator unavailable
+                </p>
+              )}
             </TableCell>
             <TableCell>
               <Badge>{label(item.stewardship_state)}</Badge>
@@ -124,6 +134,15 @@ export function StewardshipQueueCard({
         <Badge variant="outline">{label(item.listing_state)}</Badge>
         <Badge>{label(item.stewardship_state)}</Badge>
       </div>
+      {item.created_by ? (
+        <p className="break-words text-[10px] text-slate-500">
+          Creator: {item.created_by.name} ({item.created_by.email})
+        </p>
+      ) : (
+        <p className="text-[10px] text-slate-500">
+          Original creator unavailable
+        </p>
+      )}
       <p className="text-sm text-slate-600">
         {item.current_steward?.name ?? "Unassigned"}
       </p>

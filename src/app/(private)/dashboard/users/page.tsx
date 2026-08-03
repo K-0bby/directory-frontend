@@ -58,6 +58,9 @@ import { useAuth } from "@/context/auth-context";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+type UserRole = "vendor" | "customer" | "user" | "admin" | "listing_agent";
 
 interface User {
   id: string;
@@ -67,14 +70,30 @@ interface User {
   avatar: string;
   phone?: string;
   listings_count: string;
-  role: "vendor" | "customer" | "user" | "admin" | "listing_agent";
+  role: UserRole;
   plan?: "Basic" | "Premium" | "Pro" | "Enterprise";
   last_active: string;
   status: "Active" | "Pending" | "Suspended" | "Inactive";
   is_suspended?: boolean;
+  role_transition: {
+    allowed_actions: Array<
+      | "make_admin"
+      | "make_user"
+      | "make_listing_agent"
+      | "remove_listing_agent"
+    >;
+    blockers: string[];
+  };
 }
 
 type TabType = "all" | "vendors" | "customers" | "admins" | "listing_agents";
+
+const ROLE_ACTION_TARGETS = {
+  make_admin: { role: "admin", label: "Make Admin" },
+  make_user: { role: "user", label: "Make Customer" },
+  make_listing_agent: { role: "listing_agent", label: "Make Listing Agent" },
+  remove_listing_agent: { role: "user", label: "Remove Agent Access" },
+} as const;
 
 export default function Users() {
   const router = useRouter();
@@ -119,6 +138,11 @@ export default function Users() {
 
   const [isSuspendModalOpen, setIsSuspendModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [pendingRoleChange, setPendingRoleChange] = useState<{
+    user: User;
+    requestedRole: UserRole;
+  } | null>(null);
+  const [roleChangeReason, setRoleChangeReason] = useState("");
   const [suspendForm, setSuspendForm] = useState({
     reason: "",
     duration: "1_day",
@@ -144,15 +168,15 @@ export default function Users() {
     return data.items || data.users || data.data || data.results || [];
   }, []);
 
-  const loadAllData = useCallback(async () => {
-    if (authLoading) return;
+  const loadAllData = useCallback(async (): Promise<User[]> => {
+    if (authLoading) return [];
     setIsLoading(true);
     setError(null);
     try {
       const token = getAuthToken();
       if (!token) {
         setIsLoading(false);
-        return;
+        return [];
       }
 
       const response = await fetch("/api/all_users", {
@@ -165,11 +189,14 @@ export default function Users() {
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
-      setAllData(extractUsersFromResponse(data));
+      const users = extractUsersFromResponse(data);
+      setAllData(users);
+      return users;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load users";
       setError(msg);
       toast.error(msg);
+      return [];
     } finally {
       setIsLoading(false);
     }
@@ -179,18 +206,41 @@ export default function Users() {
     if (!authLoading && authUser) loadAllData();
   }, [authUser, authLoading, loadAllData]);
 
-  const handleRoleChange = async (targetUser: User, newRole: string) => {
+  const openRoleChangeDialog = (targetUser: User, newRole: string) => {
     if (targetUser.role === newRole) return;
+    if (!["vendor", "customer", "user", "admin", "listing_agent"].includes(newRole)) {
+      toast.error("Invalid role selection");
+      return;
+    }
+
+    setRoleChangeReason("");
+    setPendingRoleChange({
+      user: targetUser,
+      requestedRole: newRole as UserRole,
+    });
+  };
+
+  const closeRoleChangeDialog = () => {
+    if (isActionLoading) return;
+    setPendingRoleChange(null);
+    setRoleChangeReason("");
+  };
+
+  const handleRoleChange = async () => {
+    if (!pendingRoleChange || isActionLoading) return;
+
+    const { user: targetUser, requestedRole: newRole } = pendingRoleChange;
+    const reason = roleChangeReason.trim();
+    if (!reason) {
+      toast.error("A reason is required for every role change.");
+      return;
+    }
+
     setIsActionLoading(true);
     try {
       const token = getAuthToken();
 
       if (targetUser.role === "listing_agent") {
-        const reason = window.prompt(
-          "Why is listing-agent access being removed? This takes effect immediately and ends active stewardship.",
-        )?.trim();
-        if (!reason) throw new Error("A removal reason is required.");
-
         const removal = await fetch(
           `/api/admin/users/${targetUser.id}/remove_listing_agent`,
           {
@@ -212,16 +262,17 @@ export default function Users() {
           );
         }
         toast.success(
-          "Listing-agent access removed. The backend selected the safe contextual replacement role.",
+          `Listing-agent access removed. New role: ${String(removalData.data?.role ?? "user").replace("_", " ")}.`,
         );
         await loadAllData();
+        setPendingRoleChange(null);
+        setRoleChangeReason("");
         return;
       }
 
       // Mapping internal UI role values to API endpoint suffixes
       const endpointSuffixMap: Record<string, string> = {
         admin: "make_admin",
-        vendor: "make_vendor",
         user: "make_user",
         customer: "make_user", // Assuming customer and user share the same endpoint
         listing_agent: "make_listing_agent",
@@ -229,18 +280,6 @@ export default function Users() {
 
       const suffix = endpointSuffixMap[newRole];
       if (!suffix) throw new Error("Invalid role selection");
-      const promotionReason =
-        newRole === "listing_agent"
-          ? window
-              .prompt(
-                "Why is this verified, eligible customer being promoted to listing agent?",
-              )
-              ?.trim()
-          : undefined;
-      if (newRole === "listing_agent" && !promotionReason) {
-        throw new Error("A promotion reason is required.");
-      }
-
       const res = await fetch(
         `/api/admin/users/${targetUser.id}/role/${suffix}`,
         {
@@ -250,19 +289,34 @@ export default function Users() {
           Accept: "application/json",
           Authorization: `Bearer ${token}`,
         },
-          body: JSON.stringify({ reason: promotionReason }),
+          body: JSON.stringify({
+            reason,
+          }),
         },
       );
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || "Failed to update user role");
       }
 
-      toast.success(`User role updated to ${newRole.replace("_", " ")}`);
+      const responseData = await res.json().catch(() => ({}));
+      const resultingRole = String(responseData.data?.role ?? newRole);
+      toast.success(`User role updated to ${resultingRole.replace("_", " ")}`);
       await loadAllData(); // Refresh the table
+      setPendingRoleChange(null);
+      setRoleChangeReason("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Action failed");
+      const refreshedUsers = await loadAllData();
+      const refreshedTarget = refreshedUsers.find(
+        (user) => user.id === pendingRoleChange.user.id,
+      );
+      if (refreshedTarget) {
+        setPendingRoleChange((current) =>
+          current ? { ...current, user: refreshedTarget } : current,
+        );
+      }
     } finally {
       setIsActionLoading(false);
     }
@@ -418,6 +472,13 @@ export default function Users() {
     return { startItem: s, endItem: e > 0 ? e : 0 };
   })();
 
+  const roleChangeIsAgentRemoval =
+    pendingRoleChange?.user.role === "listing_agent";
+  const roleChangeRequiresReason = pendingRoleChange !== null;
+  const roleLabel = (role: UserRole) =>
+    (role === "user" || role === "customer" ? "Customer" : role.replace("_", " "))
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
   return (
     <div className="p-2 lg:p-6 space-y-6">
       <h1 className="text-3xl font-semibold">Users</h1>
@@ -571,29 +632,41 @@ export default function Users() {
                           : "Never"}
                       </TableCell>
                       <TableCell>
-                        {suspended ? (
-                          <Badge className="bg-red-500 hover:bg-red-500 text-white font-normal">
-                            Suspended
-                          </Badge>
-                        ) : (
+                        <div className="space-y-1">
+                          {suspended && (
+                            <Badge className="bg-red-500 font-normal text-white hover:bg-red-500">
+                              Suspended
+                            </Badge>
+                          )}
+                          {u.role_transition?.allowed_actions.length > 0 ? (
                           <Select
                             disabled={isActionLoading}
-                            value={u.role}
-                            onValueChange={(val) => handleRoleChange(u, val)}
+                            value=""
+                            onValueChange={(val) => openRoleChangeDialog(u, val)}
                           >
-                            <SelectTrigger className="w-[100px] h-8 text-xs shadow-none border-gray-300 focus:ring-0 rounded-full">
-                              <SelectValue />
+                            <SelectTrigger className="h-8 w-[150px] rounded-full border-gray-300 text-xs shadow-none focus:ring-0">
+                              <span>{roleLabel(u.role)}</span>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="user">User</SelectItem>
-                              <SelectItem value="vendor">Vendor</SelectItem>
-                              <SelectItem value="listing_agent">
-                                Listing Agent
-                              </SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
+                              {u.role_transition.allowed_actions.map((action) => (
+                                <SelectItem
+                                  key={action}
+                                  value={ROLE_ACTION_TARGETS[action].role}
+                                >
+                                  {ROLE_ACTION_TARGETS[action].label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
-                        )}
+                          ) : (
+                            <Badge variant="outline">{roleLabel(u.role)}</Badge>
+                          )}
+                          {u.role_transition?.blockers.map((blocker) => (
+                            <p key={blocker} className="max-w-56 text-[10px] leading-4 text-slate-500">
+                              {blocker}
+                            </p>
+                          ))}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -697,6 +770,110 @@ export default function Users() {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={pendingRoleChange !== null}
+        onOpenChange={(open) => !open && closeRoleChangeDialog()}
+      >
+        <DialogContent className="sm:max-w-md" showCloseButton={!isActionLoading}>
+          <DialogHeader>
+            <DialogTitle>Confirm role change</DialogTitle>
+            <DialogDescription>
+              Review this account change before applying it.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingRoleChange && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-slate-50 p-4">
+                <p className="font-medium text-slate-900">
+                  {pendingRoleChange.user.first_name}{" "}
+                  {pendingRoleChange.user.last_name}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {pendingRoleChange.user.email}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant="outline">
+                    {roleLabel(pendingRoleChange.user.role)}
+                  </Badge>
+                  <span aria-hidden="true" className="text-slate-400">→</span>
+                  <Badge variant="outline">
+                    {roleChangeIsAgentRemoval
+                      ? "Customer or Vendor"
+                      : roleLabel(pendingRoleChange.requestedRole)}
+                  </Badge>
+                </div>
+              </div>
+
+              {roleChangeIsAgentRemoval && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  Listing-agent access and active stewardship end immediately.
+                  The system will assign Customer, or Vendor for an eligible
+                  grandfathered owner.
+                </p>
+              )}
+
+              {pendingRoleChange.user.role_transition.blockers.length > 0 && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  {pendingRoleChange.user.role_transition.blockers.map((blocker) => (
+                    <p key={blocker}>{blocker}</p>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-sm text-slate-600">
+                Active sessions may be revoked so the account’s permissions are
+                re-established under the new role.
+              </p>
+
+              {roleChangeRequiresReason && (
+                <div className="space-y-2">
+                  <Label htmlFor="role-change-reason" className="text-sm font-semibold">
+                    Reason
+                  </Label>
+                  <Textarea
+                    id="role-change-reason"
+                    autoFocus
+                    maxLength={500}
+                    value={roleChangeReason}
+                    onChange={(event) => setRoleChangeReason(event.target.value)}
+                    placeholder={
+                      roleChangeIsAgentRemoval
+                        ? "Why is listing-agent access being removed?"
+                        : "Why is this role being changed?"
+                    }
+                    disabled={isActionLoading}
+                  />
+                  <p className="text-xs text-slate-500">
+                    Required for the administrator role-change audit record.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeRoleChangeDialog}
+              disabled={isActionLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleRoleChange()}
+              disabled={
+                isActionLoading ||
+                (roleChangeRequiresReason && !roleChangeReason.trim())
+              }
+            >
+              {isActionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isActionLoading ? "Updating…" : "Confirm role change"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isSuspendModalOpen} onOpenChange={setIsSuspendModalOpen}>
         <DialogContent className="sm:max-w-md">
