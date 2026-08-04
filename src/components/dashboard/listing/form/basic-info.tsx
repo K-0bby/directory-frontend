@@ -29,7 +29,11 @@ import {
 import { FormErrorSummary } from "@/components/ui/form-error-summary";
 
 // Phone Input Imports
-import { PhoneInput } from "react-international-phone";
+import {
+  defaultCountries,
+  parseCountry,
+  PhoneInput,
+} from "react-international-phone";
 import "react-international-phone/style.css";
 
 // --- Validation Schema ---
@@ -90,6 +94,31 @@ interface Props {
   initialName?: string;
   onValidityChange?: (isValid: boolean) => void;
 }
+
+const iso2ForDialCode = (dialCode?: string | null): string => {
+  const digits = dialCode?.replace(/\D/g, "");
+  if (!digits) return "gb";
+
+  const countries = defaultCountries.map(parseCountry);
+  const preferredIso2 = ["gb", "gh", "ng", "ke", "za", "us", "ca"];
+  const country =
+    preferredIso2
+      .map((iso2) => countries.find((candidate) => candidate.iso2 === iso2))
+      .find((candidate) => candidate?.dialCode === digits) ??
+    countries.find((candidate) => candidate.dialCode === digits);
+
+  return country?.iso2 || "gb";
+};
+
+const internationalPhoneValue = (
+  dialCode?: string | null,
+  phone?: string | null,
+): string => {
+  if (!phone) return "";
+  if (phone.startsWith("+")) return phone;
+
+  return `${dialCode || ""}${phone}`;
+};
 
 // Config for dynamic labels
 const basicInfoConfig = {
@@ -318,7 +347,12 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
     useImperativeHandle(ref, () => ({
       async submit() {
         setSubmitErrors([]);
-        const isValid = await trigger();
+        const isEvent = listingType === "event";
+        const isValid = await trigger(
+          isEvent
+            ? ["name", "category_ids", "description", "type"]
+            : undefined,
+        );
         if (!isValid) {
           toast.error("Please correct the errors in the form.");
           return false;
@@ -327,7 +361,11 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
         const rawData = form.getValues();
 
         // Validate phones with libphonenumber-js before submitting
-        if (rawData.primary_phone && rawData.primary_phone.replace(/\D/g, "").length > 0) {
+        if (
+          !isEvent &&
+          rawData.primary_phone &&
+          rawData.primary_phone.replace(/\D/g, "").length > 0
+        ) {
           if (!validatePhone(rawData.primary_phone, primaryIso2)) {
             form.setError("primary_phone", {
               message: "Please enter a valid phone number for the selected country",
@@ -336,7 +374,11 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
             return false;
           }
         }
-        if (rawData.secondary_phone && rawData.secondary_phone.replace(/\D/g, "").length > 0) {
+        if (
+          !isEvent &&
+          rawData.secondary_phone &&
+          rawData.secondary_phone.replace(/\D/g, "").length > 0
+        ) {
           if (!validatePhone(rawData.secondary_phone, secondaryIso2)) {
             form.setError("secondary_phone", {
               message: "Please enter a valid phone number for the selected country",
@@ -362,20 +404,20 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
           category_ids: rawData.category_ids
             .filter((id) => id !== "other")
             .map((id) => Number(id)),
-          ...(rawData.email ? { email: rawData.email } : {}),
-          ...(normalizeUrl(rawData.website || "")
+          ...(!isEvent && rawData.email ? { email: rawData.email } : {}),
+          ...(!isEvent && normalizeUrl(rawData.website || "")
             ? { website: normalizeUrl(rawData.website || "") }
             : {}),
-          ...(rawData.business_reg_num
+          ...(!isEvent && rawData.business_reg_num
             ? { business_reg_num: rawData.business_reg_num }
             : {}),
-          ...(cleanedPrimaryPhone
+          ...(!isEvent && cleanedPrimaryPhone
             ? {
                 primary_phone: cleanedPrimaryPhone,
                 primary_country_code: rawData.primary_country_code,
               }
             : {}),
-          ...(cleanedSecondaryPhone
+          ...(!isEvent && cleanedSecondaryPhone
             ? {
                 secondary_phone: cleanedSecondaryPhone,
                 secondary_country_code: rawData.secondary_country_code,
@@ -500,24 +542,44 @@ export const BasicInformationForm = forwardRef<ListingFormHandle, Props>(
             const json = await res.json();
             const d = json.data;
 
-            // Reconstruct full strings so PhoneInput recognizes the country flag
-            const fullPrimaryPhone = `${d.country_code || ""}${d.primary_phone || ""}`;
-            const fullSecondaryPhone = d.secondary_phone
-              ? `${d.secondary_country_code || ""}${d.secondary_phone}`
-              : "";
+            const isEvent = listingType === "event";
+            // Event contact data belongs exclusively to the Public Contact step.
+            // For other listing types, reconstruct international values so the
+            // phone inputs and their validators use the saved country.
+            const fullPrimaryPhone = isEvent
+              ? ""
+              : internationalPhoneValue(
+                  d.primary_country_code,
+                  d.primary_phone,
+                );
+            const fullSecondaryPhone = isEvent
+              ? ""
+              : internationalPhoneValue(
+                  d.secondary_country_code,
+                  d.secondary_phone,
+                );
+
+            if (!isEvent) {
+              setPrimaryIso2(iso2ForDialCode(d.primary_country_code));
+              setSecondaryIso2(iso2ForDialCode(d.secondary_country_code));
+            }
 
             // Populate the form with data from the API
             reset({
               name: d.name || "",
               description: d.bio || d.description || "",
-              email: d.email || "",
-              website: d.website || "",
+              email: isEvent ? "" : d.email || "",
+              website: isEvent ? "" : d.website || "",
               primary_phone: fullPrimaryPhone,
-              primary_country_code: d.primary_country_code || "+44",
+              primary_country_code: isEvent
+                ? ""
+                : d.primary_country_code || "+44",
               secondary_phone: fullSecondaryPhone,
-              secondary_country_code: d.secondary_country_code || "+44",
+              secondary_country_code: isEvent
+                ? ""
+                : d.secondary_country_code || "+44",
               category_ids: d.categories?.map((category: Category) => String(category.id)) || [],
-              business_reg_num: d.business_reg_num || "",
+              business_reg_num: isEvent ? "" : d.business_reg_num || "",
               type: listingType,
             });
 
